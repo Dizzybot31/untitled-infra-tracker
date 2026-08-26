@@ -1,0 +1,21 @@
+# Build artifacts, not source.
+data/nirmaan.sqlite
+data/nirmaan.sqlite-journal
+data/raw/_cache/
+
+# data/derived/ is deliberately NOT ignored. Committing it is the whole point:
+# git history becomes the audit trail of what changed in the data and when.
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+_site/
+node_modules/

@@ -1,0 +1,61 @@
+# Publish the globe to GitHub Pages.
+#
+# The site is fully static: no backend, no build step, no npm install. The
+# frontend loads the JSON that `refresh` commits, so a data refresh
+# automatically redeploys the site.
+
+name: deploy pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'data/derived/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site
+        run: |
+          mkdir -p _site/web _site/data/derived
+          cp -R web/. _site/web/
+          cp -R data/derived/. _site/data/derived/
+          # Keep the repo's relative layout (web/ alongside data/) so the same
+          # paths work locally and in production, and send / to the app.
+          cat > _site/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8">
+          <title>Nirmaan</title>
+          <meta http-equiv="refresh" content="0; url=./web/">
+          <link rel="canonical" href="./web/">
+          <p style="font:14px system-ui;background:#05070c;color:#e8edf6">
+            Redirecting to <a style="color:#22d39a" href="./web/">the globe</a>.
+          </p>
+          HTML
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

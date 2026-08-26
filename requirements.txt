@@ -1,0 +1,10 @@
+# The pipeline runs on the Python standard library alone. That is a deliberate
+# constraint: it means `git clone && python3 -m pipeline.run all` works on a
+# stock macOS or Ubuntu box with no virtualenv, and CI has nothing to pin,
+# cache, or audit.
+#
+# Anything below is OPTIONAL and only needed for adapters that parse PDFs.
+# Install with:  python3 -m pip install -r requirements.txt
+#
+# pdfplumber>=0.11     # text and simple table extraction from MoSPI flash reports
+# camelot-py>=0.11     # ruled-table extraction where pdfplumber struggles

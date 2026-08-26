@@ -1,0 +1,100 @@
+# Scheduled data refresh — this is the engine that makes Nirmaan a tracker
+# rather than a snapshot.
+#
+# The pattern is "git scraping": run the pipeline on a schedule and commit the
+# output back to the repository. Git history then *is* the audit trail — every
+# cost revision and slipped deadline is a diff with a timestamp and an author,
+# permanently, for free. (Popularised by Simon Willison:
+# https://simonwillison.net/2020/Oct/9/git-scraping/)
+#
+# Two things will bite you eventually, so they are called out here:
+#   1. GitHub disables scheduled workflows in repositories with no activity for
+#      60 days. If the data stops updating, check that first.
+#   2. Scheduled runs are queued, not punctual. Cron here is a hint; runs are
+#      routinely late by 10-30 minutes under load. Never build anything that
+#      needs minute-level precision on top of it.
+
+name: refresh data
+
+on:
+  schedule:
+    # 01:30 UTC = 07:00 IST, after most Indian government sites publish.
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Space-separated source ids to run (blank = all)'
+        required: false
+        default: ''
+      strict:
+        description: 'Fail the run if any adapter fails'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The pipeline is standard-library only by design, so there is nothing to
+      # install and nothing to pin. If you add a dependency, add it here and in
+      # requirements.txt, and think hard about whether you really need it.
+      - name: Show environment
+        run: python3 -VV
+
+      - name: Run tests before touching data
+        run: python3 -m unittest discover -s tests
+
+      - name: Ingest
+        run: |
+          python3 -m pipeline.run ingest \
+            ${{ github.event.inputs.only && format('--only {0}', github.event.inputs.only) || '' }} \
+            ${{ github.event.inputs.strict == 'true' && '--strict' || '' }}
+
+      - name: Resolve entities across sources
+        run: python3 -m pipeline.run link
+
+      - name: Publish static data
+        run: python3 -m pipeline.run publish
+
+      - name: Summarise
+        run: |
+          python3 -m pipeline.run stats | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # The SQLite database is a build artifact, not source. Only the derived
+      # JSON is committed, so diffs stay reviewable. The database is uploaded
+      # separately so a failed run can be inspected.
+      - name: Upload database for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nirmaan-sqlite
+          path: data/nirmaan.sqlite
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Commit changed data
+        run: |
+          git config user.name  'nirmaan-bot'
+          git config user.email 'nirmaan-bot@users.noreply.github.com'
+          git add data/derived
+          if git diff --cached --quiet; then
+            echo "No data changes." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          CHANGED=$(git diff --cached --stat | tail -1)
+          git commit -m "data: scheduled refresh" -m "$CHANGED"
+          git push
