@@ -1,4 +1,4 @@
-# Nirmaan
+# Untitled: Infra Tracker
 
 **What India is building, and what it isn't.**
 
@@ -9,7 +9,7 @@ from and the moment it was read.
 Most government dashboards tell you today's figure. They do not tell you that a
 project's completion date has been pushed back four times, that its cost
 estimate has doubled since sanction, or that its forest clearance was returned
-by the appraisal committee two years ago. Nirmaan keeps the history, so the
+by the appraisal committee two years ago. Untitled: Infra Tracker keeps the history, so the
 interesting question — *what changed, and when did they tell us?* — is
 answerable.
 
@@ -24,8 +24,8 @@ answerable.
 No Node, no npm, no Docker, no virtualenv, no API keys.
 
 ```bash
-git clone https://github.com/dizzybot31/nirmaan.git
-cd nirmaan
+git clone https://github.com/dizzybot31/untitled-infra-tracker.git
+cd untitled-infra-tracker
 python3 -m pipeline.run all
 python3 -m http.server 8777
 ```
@@ -73,7 +73,7 @@ refresh faster than the government publishes. What is achievable:
 
 So the honest promise is **"updated daily, showing you what the government last
 said and when they said it"** — not a live feed. That is why every record in
-Nirmaan carries a `retrieved_at`, and why the UI shows it rather than hiding it.
+Untitled: Infra Tracker carries a `retrieved_at`, and why the UI shows it rather than hiding it.
 A tracker whose real value is *change over time* does not need to be live; it
 needs to be **consistent, dated, and never silently wrong**.
 
@@ -168,7 +168,7 @@ These are the rules the code enforces, not aspirations.
 
 ## This is not investment advice
 
-Nirmaan is a data visualisation of public records. It is not a recommendation
+Untitled: Infra Tracker is a data visualisation of public records. It is not a recommendation
 to buy, sell, or hold anything, and it is not personalised advice. Figures are
 as reported by the source on the date shown and may be stale or wrong at
 source. See [`docs/LEGAL.md`](docs/LEGAL.md) for attribution, licensing,

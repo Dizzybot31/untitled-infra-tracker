@@ -1,6 +1,6 @@
 # Build artifacts, not source.
-data/nirmaan.sqlite
-data/nirmaan.sqlite-journal
+data/tracker.sqlite
+data/tracker.sqlite-journal
 data/raw/_cache/
 
 # data/derived/ is deliberately NOT ignored. Committing it is the whole point:

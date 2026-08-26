@@ -22,7 +22,7 @@ _REF = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ref", "seed_pro
 class SeedAdapter(Adapter):
     source_id = "seed"
     source_name = "Curated seed (hand-entered)"
-    source_url = "https://github.com/dizzybot31/nirmaan/blob/main/pipeline/ref/seed_projects.json"
+    source_url = "https://github.com/dizzybot31/untitled-infra-tracker/blob/main/pipeline/ref/seed_projects.json"
     publisher = "This project"
     upstream_cadence = "manual"
     access_mode = "bundled"

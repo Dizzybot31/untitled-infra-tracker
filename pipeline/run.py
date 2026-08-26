@@ -26,7 +26,7 @@ from .adapters.nhai_geoserver import NhaiGeoserverAdapter
 from .core import gazetteer, ids, publish as publish_mod, schema
 from .core.store import Store
 
-DB_PATH = os.path.join("data", "nirmaan.sqlite")
+DB_PATH = os.path.join("data", "tracker.sqlite")
 
 # Register adapters here. Order matters only for tie-breaking on merge:
 # later adapters are treated as more authoritative than earlier ones.

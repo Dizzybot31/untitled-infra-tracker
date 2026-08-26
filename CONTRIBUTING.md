@@ -28,8 +28,8 @@ including dead ends, so you don't repeat that work).
 There isn't one, on purpose. Python 3.9+ is the only requirement.
 
 ```bash
-git clone https://github.com/dizzybot31/nirmaan.git
-cd nirmaan
+git clone https://github.com/dizzybot31/untitled-infra-tracker.git
+cd untitled-infra-tracker
 python3 -m unittest discover -s tests
 python3 -m pipeline.run all
 python3 -m http.server 8777    # then open http://localhost:8777/web/

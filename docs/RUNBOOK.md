@@ -20,7 +20,7 @@ The NHAI GeoServer is a real, unhardened government service (Apache Tomcat
 8.5.53, no docs, no rate limiting). It has been observed to time out on large
 unfiltered pulls. The adapter already requests only named columns to keep
 payloads small (~0.5–1.3 MB per layer); if it starts failing, check
-`data/nirmaan.sqlite`'s `runs` table for the recorded error before assuming
+`data/tracker.sqlite`'s `runs` table for the recorded error before assuming
 the source is gone.
 
 ## Diagnosing an adapter failure
@@ -29,7 +29,7 @@ Every run is recorded, success or failure:
 
 ```bash
 python3 -m pipeline.run stats
-sqlite3 data/nirmaan.sqlite "select * from runs order by started_at desc limit 5;"
+sqlite3 data/tracker.sqlite "select * from runs order by started_at desc limit 5;"
 ```
 
 An adapter that returns zero records is treated as a **failure**

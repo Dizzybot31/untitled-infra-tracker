@@ -8,7 +8,7 @@ and (b) something a static globe frontend can load fast, for free, forever.
 Those are different jobs and don't need the same technology.
 
 ## Decision
-- **`data/nirmaan.sqlite`** is the pipeline's working database: one row per
+- **`data/tracker.sqlite`** is the pipeline's working database: one row per
   project (current state) plus an append-only `changes` table. It is a build
   artifact — gitignored, rebuilt by re-running `ingest`, uploaded as a CI
   artifact for debugging, never committed.

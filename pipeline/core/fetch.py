@@ -27,7 +27,7 @@ from typing import Any, Dict, Optional, Tuple
 
 # Identify honestly. Replace the URL with your fork before running at volume.
 USER_AGENT = (
-    "nirmaan-bot/0.1 (+https://github.com/dizzybot31/nirmaan; "
+    "untitled-infra-tracker-bot/0.1 (+https://github.com/dizzybot31/untitled-infra-tracker; "
     "public infrastructure transparency project; contact via GitHub issues)"
 )
 

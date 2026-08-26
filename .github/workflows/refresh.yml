@@ -1,4 +1,4 @@
-# Scheduled data refresh — this is the engine that makes Nirmaan a tracker
+# Scheduled data refresh — this is the engine that makes Untitled: Infra Tracker a tracker
 # rather than a snapshot.
 #
 # The pattern is "git scraping": run the pipeline on a schedule and commit the
@@ -81,15 +81,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nirmaan-sqlite
-          path: data/nirmaan.sqlite
+          name: untitled-infra-tracker-sqlite
+          path: data/tracker.sqlite
           retention-days: 14
           if-no-files-found: warn
 
       - name: Commit changed data
         run: |
-          git config user.name  'nirmaan-bot'
-          git config user.email 'nirmaan-bot@users.noreply.github.com'
+          git config user.name  'untitled-infra-tracker-bot'
+          git config user.email 'untitled-infra-tracker-bot@users.noreply.github.com'
           git add data/derived
           if git diff --cached --quiet; then
             echo "No data changes." | tee -a "$GITHUB_STEP_SUMMARY"

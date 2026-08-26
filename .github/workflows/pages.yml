@@ -38,7 +38,7 @@ jobs:
           # paths work locally and in production, and send / to the app.
           cat > _site/index.html <<'HTML'
           <!doctype html><meta charset="utf-8">
-          <title>Nirmaan</title>
+          <title>Untitled: Infra Tracker</title>
           <meta http-equiv="refresh" content="0; url=./web/">
           <link rel="canonical" href="./web/">
           <p style="font:14px system-ui;background:#05070c;color:#e8edf6">
