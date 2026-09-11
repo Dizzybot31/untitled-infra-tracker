@@ -1,112 +1,140 @@
-import {
-  STATUS_COLOR, STATUS_LABEL, SECTOR_LABEL,
-  BLOCK_REASON_LABEL, GEO_CONFIDENCE_NOTE,
-} from './config.js';
-import { crore, monthYear, dateTime, delayText, esc, titleCase } from './format.js';
+// The detail panel.
+//
+// The previous version promised capabilities the data does not have:
+//   - a cost_overrun_pct figure, non-null on 0 of 1,849 records
+//   - a delay_months alarm, populated on 9 (all hand-entered seed rows)
+//   - a "What changed" section whose empty state apologised at length
+// All three are gone. What replaces them is narrower and true: the completion
+// date the source publishes today, and how long ago it passed.
+//
+// Provenance and location-confidence are untouched and, on narrow screens, now
+// sit ABOVE the details block so they land in the first screenful.
 
-export function renderPanel(el, d, onClose) {
-  if (!d) { el.hidden = true; el.innerHTML = ''; return; }
+import { STATUS_LABEL, SECTOR_LABEL, BLOCK_REASON_LABEL, GEO_CONFIDENCE_NOTE, BUCKET_COLOR } from './config.js';
+import { crore, monthYear, dateTime, agoText, esc, titleCase, num } from './format.js';
 
-  const color = STATUS_COLOR[d.status] || STATUS_COLOR.unknown;
-  const unverified = (d.tags || []).includes('unverified');
+export function renderPanel(el, view, { onClose, onSelect }) {
+  if (!view) { el.hidden = true; el.innerHTML = ''; return; }
+  el.innerHTML = view.kind === 'list' ? listMarkup(view) : projectMarkup(view);
+  el.hidden = false;
+  el.scrollTop = 0;
+
+  el.querySelector('.close').addEventListener('click', onClose);
+  el.querySelectorAll('[data-goto]').forEach((b) =>
+    b.addEventListener('click', () => onSelect(b.dataset.goto)));
+
+  const h = el.querySelector('#panel-title');
+  if (h) h.focus();
+}
+
+// --- a coordinate stack or a state group -----------------------------------
+function listMarkup(v) {
+  return `
+    <button class="close" aria-label="Close">&times;</button>
+    <h2 id="panel-title" tabindex="-1">${esc(v.heading)}</h2>
+    <p class="p-sub">${esc(v.sub)}</p>
+    <ul class="plist">
+      ${v.members.map((m) => `
+        <li>
+          <button data-goto="${esc(m.id)}">
+            <span class="pl-dot" style="background:${BUCKET_COLOR[m.bucket]}"></span>
+            <span class="pl-title">${esc(m.title)}</span>
+            <span class="pl-meta">${esc([crore(m.cost_inr_crore),
+              m.overdueMonths > 0 ? agoText(m.overdueMonths) + ' past due' : null]
+              .filter(Boolean).join(' · '))}</span>
+          </button>
+        </li>`).join('')}
+    </ul>`;
+}
+
+// --- one project ------------------------------------------------------------
+function projectMarkup(v) {
+  const r = v.row;              // always present, from the already-loaded geojson
+  const d = v.detail;           // may still be loading
+  const color = BUCKET_COLOR[r.bucket];
 
   const figures = [];
-  const cost = crore(d.cost_inr_crore);
-  if (cost) {
-    const orig = crore(d.cost_original_inr_crore);
-    figures.push(fig('Current cost', cost,
-      d.cost_overrun_pct ? `up ${d.cost_overrun_pct}% from ${orig}` : null,
-      d.cost_overrun_pct > 0));
-  }
-  if (d.progress_pct != null) figures.push(fig('Physical progress', d.progress_pct + '%'));
-  if (d.revised_completion_date) {
-    figures.push(fig('Target completion', monthYear(d.revised_completion_date),
-      d.original_completion_date ? `originally ${monthYear(d.original_completion_date)}` : null,
-      (d.delay_months || 0) > 0));
-  } else if (d.original_completion_date) {
-    figures.push(fig('Target completion', monthYear(d.original_completion_date)));
-  }
-  if (d.commissioned_date) figures.push(fig('Commissioned', monthYear(d.commissioned_date)));
-  if (d.delay_months != null && d.delay_months !== 0) {
-    figures.push(fig('Schedule', delayText(d.delay_months), null, d.delay_months > 0, true));
+
+  const cost = crore(r.cost_inr_crore);
+  if (cost) figures.push(fig('Cost', cost));
+
+  // The schedule figure. This is the product's central claim, so its wording is
+  // exact: it is the date the source publishes TODAY, not a baseline comparison.
+  if (r.bucket === 'past_due') {
+    figures.push(fig('Completion date, as published',
+      `${monthYear(r.revised_completion_date)} · ${agoText(r.overdueMonths)}`,
+      null, true));
+  } else if (r.revised_completion_date) {
+    figures.push(fig('Completion date, as published', monthYear(r.revised_completion_date)));
+  } else if (r.lifecycle === 'building') {
+    figures.push(fig('Completion date', 'Not published by this source'));
   }
 
-  const blockHtml = (d.block_reason || d.block_detail) ? `
+  if (d && d.progress_pct != null) figures.push(fig('Physical progress', d.progress_pct + '%'));
+
+  const blockHtml = (r.block_reason || (d && d.block_detail)) ? `
     <div class="p-block">
-      <div class="k">${esc(BLOCK_REASON_LABEL[d.block_reason] || 'Obstruction')}</div>
-      <div class="v">${esc(d.block_detail || 'No further detail recorded by the source.')}</div>
+      <div class="k">${esc(BLOCK_REASON_LABEL[r.block_reason] || 'Obstruction')}</div>
+      <div class="v">${esc((d && d.block_detail) || 'The source records an obstruction but gives no further detail.')}</div>
     </div>` : '';
 
-  const facts = [
+  const pastDueNote = r.bucket === 'past_due' ? `
+    <p class="note">This is the completion date the source publishes today. It does not publish an
+    original sanctioned date, so we cannot tell you how far this project has slipped — only that
+    this date has passed.</p>` : '';
+
+  const notDrawn = r.lifecycle === 'open' ? `
+    <p class="note">Already open${r.revised_completion_date ? ' since ' + esc(monthYear(r.revised_completion_date)) : ''}
+    — not shown on the globe by default, which shows work in progress and work that has stopped.</p>` : '';
+
+  const facts = d ? [
     ['Sector', SECTOR_LABEL[d.sector] || titleCase(d.sector)],
-    ['Subsector', d.subsector],
     ['State', d.admin && d.admin.state],
     ['District', d.admin && d.admin.district],
     ['Executing agency', d.executing_agency],
     ['Ministry', d.ministry],
-    ['Sanctioned', monthYear(d.sanctioned_date)],
-  ].filter(([, v]) => v);
+    // Kept behind a guard so it lights up on its own if a source ever starts
+    // publishing baselines. Fires on 10 records today.
+    ['Originally scheduled', d.original_completion_date ? monthYear(d.original_completion_date) : null],
+  ].filter(([, x]) => x) : [];
 
-  const history = (d.history || []).slice().reverse();
-  const historyHtml = history.length ? `
-    <div class="timeline">
-      ${history.map((h) => `
-        <div class="tl-item">
-          <div class="when">${esc(dateTime(h.observed_at))}</div>
-          <div class="what">${esc(titleCase(h.field))} changed from
-            <strong>${esc(h.old_value ?? '—')}</strong> to
-            <strong>${esc(h.new_value ?? '—')}</strong></div>
-        </div>`).join('')}
-    </div>` : `
-    <p class="tl-empty">No changes recorded yet. This project has been seen in
-    every run since ${esc(dateTime(d.first_seen))} without any tracked field
-    moving. Once the pipeline has run a few times against a live source, cost
-    revisions and slipped deadlines appear here.</p>`;
-
-  const provHtml = (d.provenance || []).map((p) => `
+  const provHtml = d ? (d.provenance || []).map((p) => `
     <div class="prov">
       <div><a href="${esc(p.source_url)}" target="_blank" rel="noopener noreferrer">${esc(p.source_name || p.source_id)}</a></div>
       <div class="when">retrieved ${esc(dateTime(p.retrieved_at))}</div>
-      ${p.note ? `<div class="note">${esc(p.note)}</div>` : ''}
-    </div>`).join('');
+      ${p.note ? `<div class="note-sm">${esc(p.note)}</div>` : ''}
+    </div>`).join('') : `<div class="prov placeholder">Loading source record…</div>`;
 
-  el.innerHTML = `
+  const unverified = d && (d.tags || []).includes('unverified');
+
+  return `
     <button class="close" aria-label="Close">&times;</button>
     <div class="p-badges">
-      <span class="badge" style="color:${color}">${esc(STATUS_LABEL[d.status] || d.status)}</span>
-      <span class="badge sector">${esc(SECTOR_LABEL[d.sector] || d.sector)}</span>
+      <span class="badge" style="color:${color}">${esc(STATUS_LABEL[r.status] || r.status)}</span>
       ${unverified ? '<span class="badge caution">Unverified seed data</span>' : ''}
     </div>
-    <h2>${esc(d.title)}</h2>
-    <div class="p-sub">${esc([d.admin && d.admin.district, d.admin && d.admin.state].filter(Boolean).join(', '))}</div>
+    <h2 id="panel-title" tabindex="-1">${esc(r.title)}</h2>
+    <div class="p-sub">${esc([r.state, d && d.admin && d.admin.district].filter(Boolean).join(' · '))}</div>
     ${blockHtml}
     ${figures.length ? `<div class="p-figures">${figures.join('')}</div>` : ''}
-    ${d.status_detail ? `<p class="tl-empty">${esc(d.status_detail)}</p>` : ''}
-
-    <h3>Details</h3>
-    <dl class="kv">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-
-    <h3>What changed</h3>
-    ${historyHtml}
+    ${pastDueNote}
+    ${notDrawn}
 
     <h3>Where this came from</h3>
     ${provHtml}
 
     <h3>Location confidence</h3>
-    <p class="geo-note">
-      ${esc(GEO_CONFIDENCE_NOTE[d.geo_confidence] || '')}
-      ${d.geo_note ? '<br>' + esc(d.geo_note) : ''}
-    </p>`;
+    <p class="geo-note">${esc(GEO_CONFIDENCE_NOTE[r.geo_confidence] || '')}
+      ${d && d.geo_note ? '<br>' + esc(d.geo_note) : ''}</p>
 
-  el.hidden = false;
-  el.scrollTop = 0;
-  el.querySelector('.close').addEventListener('click', onClose);
+    ${facts.length ? `<h3>Details</h3><dl class="kv">${
+      facts.map(([k, x]) => `<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join('')}</dl>` : ''}`;
 }
 
-function fig(k, v, sub, alarm = false, wide = false) {
-  return `<div class="fig${alarm ? ' alarm' : ''}${wide ? ' wide' : ''}">
+function fig(k, v, sub, alarm) {
+  return `<div class="fig${alarm ? ' alarm' : ''}">
     <div class="k">${esc(k)}</div>
     <div class="v">${esc(v)}</div>
-    ${sub ? `<div class="k" style="margin-top:.2rem;text-transform:none;letter-spacing:0">${esc(sub)}</div>` : ''}
+    ${sub ? `<div class="k sub">${esc(sub)}</div>` : ''}
   </div>`;
 }

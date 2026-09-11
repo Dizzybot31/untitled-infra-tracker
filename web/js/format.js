@@ -22,12 +22,16 @@ export function dateTime(iso) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
-export function delayText(months) {
-  if (months == null) return null;
-  if (months <= 0) return 'On or ahead of original schedule';
-  if (months < 12) return months + ' month' + (months === 1 ? '' : 's') + ' behind original schedule';
+// Replaces delayText(), which was deleted outright rather than reworded.
+// Every string delayText could produce ended in "behind original schedule" - a
+// claim about slip against a baseline. Only 10 of 1,849 records have an original
+// date, so that phrasing was unsupportable for 99.5% of the corpus. This says
+// only how long ago a published date passed, which is a fact we actually hold.
+export function agoText(months) {
+  if (months == null || months <= 0) return null;
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
   const y = Math.floor(months / 12), m = months % 12;
-  return y + ' year' + (y === 1 ? '' : 's') + (m ? ' ' + m + ' mo' : '') + ' behind original schedule';
+  return `${y} yr${m ? ' ' + m + ' mo' : ''} ago`;
 }
 
 export function esc(s) {
@@ -38,4 +42,8 @@ export function esc(s) {
 
 export function titleCase(s) {
   return String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function num(n) {
+  return Number(n || 0).toLocaleString('en-IN');
 }

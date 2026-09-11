@@ -1,54 +1,60 @@
-// Single place for the things you will want to change.
+// Config and vocabulary.
 //
-// Dependencies load as ES modules from a CDN so this app needs no build step
-// and no npm install - open index.html through any static server and it runs.
-// Pin exact versions before you rely on this in production; see
-// docs/adr/0002-frontend.md for the Vite migration path.
-// Versions verified live on the npm registry on 2026-08-25:
-//   globe.gl 2.46.2 | three-globe 2.45.2 | three 0.185.1 | deck.gl 9.3.10
-// Pinned exactly so a CDN-side major bump cannot silently break the page.
-// Note if you later add three.js postprocessing: postprocessing@6.39.4 declares
-// peerDependencies three ">=0.168.0 <0.186.0", which three@0.185.1 is one minor
-// release away from violating.
-export const CDN = {
-  globeGl: 'https://esm.sh/globe.gl@2.46.2',
-};
+// globe.gl now loads as a single vendored UMD <script> in index.html, not as an
+// ES module from a CDN. The old esm.sh import pulled 150 separate files and cost
+// 5.3s before first paint; the bundle is one same-origin request.
 
-// Texture URLs. three-globe ships these example textures; swap for NASA Blue
-// Marble / GIBS imagery if you want higher resolution or full offline hosting.
 export const TEXTURES = {
-  earthNight: 'https://unpkg.com/three-globe/example/img/earth-night.jpg',
-  earthDay: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-  bump: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
-  sky: 'https://unpkg.com/three-globe/example/img/night-sky.png',
+  earthNight: 'vendor/earth-night.jpg',
 };
 
 export const DATA = {
   projects: '../data/derived/projects.geojson',
   corridors: '../data/derived/corridors.geojson',
   details: '../data/derived/details.json',
-  changes: '../data/derived/changes.json',
   meta: '../data/derived/meta.json',
 };
 
-// Status palette. Two families on purpose: the product is "what is being
-// built" (cool colours) versus "what is not happening" (warm colours).
-export const STATUS_COLOR = {
-  proposed:          '#8b7cf6',
-  approved:          '#7c8cf8',
-  cleared:           '#5aa9f8',
-  tendered:          '#41b8e8',
-  awarded:           '#2fc6c0',
-  under_construction:'#22d39a',
-  commissioned:      '#7fe3b8',
-  stalled:           '#f5a524',
-  blocked:           '#f26d3d',
-  rejected:          '#ef4056',
-  withdrawn:         '#c2456b',
-  cancelled:         '#8b2f4a',
-  unknown:           '#6b7280',
+// ---------------------------------------------------------------------------
+// The globe palette. FOUR values, not thirteen.
+//
+// The old palette gave 1,667 of 1,849 points two greens ~18 deltaE apart, so the
+// globe read as one undifferentiated hairball. These four are the only
+// distinctions the globe has to carry, and each one means exactly one thing.
+//
+// Critically, "no date published" is its own neutral grey rather than being
+// folded into green. Green previously meant both "this is fine" and "we have no
+// idea", which is the one place the product's honesty rule leaked into the
+// primary visual encoding.
+export const BUCKET_COLOR = {
+  past_due:    '#f5a524',  // amber  - past the completion date its source publishes
+  on_schedule: '#2fc6c0',  // teal   - a date is published and is still in the future
+  no_date:     '#7b87a2',  // slate  - the source publishes no completion date at all
+  stopped:     '#ef4056',  // red    - halted, cancelled, or carrying an obstruction
+  unlocated:   '#5d6b82',  // dimmer slate - the state discs, outside the status palette
+  open:        '#3f5170',  // dim    - already-open projects, only when opted in
 };
 
+export const BUCKET_LABEL = {
+  past_due: 'past due',
+  on_schedule: 'on schedule',
+  no_date: 'no date published',
+  stopped: 'stopped',
+  open: 'already open',
+  unstated: 'status not stated',
+};
+
+// Order matters: it is the key row order, and it is the precedence used when a
+// coordinate stack has members in several buckets (worst wins, so an alarm can
+// never be hidden behind a healthier neighbour).
+export const BUCKET_ORDER = ['past_due', 'stopped', 'on_schedule', 'no_date'];
+export const BUCKET_SEVERITY = { stopped: 3, past_due: 2, no_date: 1, on_schedule: 0,
+                                 open: -1, unstated: -1 };
+
+// ---------------------------------------------------------------------------
+// Kept in full, unchanged: the panel still shows the source's own fine-grained
+// status with a text label beside the swatch, where 13 values are informative
+// rather than noise.
 export const STATUS_LABEL = {
   proposed: 'Proposed', approved: 'Approved', cleared: 'Cleared',
   tendered: 'Tendered', awarded: 'Awarded',
@@ -83,9 +89,9 @@ export const BLOCK_REASON_LABEL = {
 
 export const GEO_CONFIDENCE_NOTE = {
   exact: 'Coordinates published by the source.',
-  site: 'Site-level location, derived.',
+  site: 'Site-level location, as published by the source for this alignment.',
   city: 'Placed at the named town or city, not the exact site.',
   district: 'Placed at the district centre, not the exact site.',
-  state: 'Placed at the state centroid. The real location within the state is unknown.',
+  state: 'The source names a state but publishes no coordinates. This project is not drawn at a point anywhere.',
   none: 'No location could be determined.',
 };

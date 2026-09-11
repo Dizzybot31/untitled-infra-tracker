@@ -1,18 +1,25 @@
-# Publish the globe to GitHub Pages.
+# GitHub Pages publisher — SUPERSEDED BY VERCEL, kept only as a manual fallback.
 #
-# The site is fully static: no backend, no build step, no npm install. The
-# frontend loads the JSON that `refresh` commits, so a data refresh
-# automatically redeploys the site.
+# Two reasons the automatic trigger is gone:
+#
+# 1. It never worked the way the old comment here claimed. This workflow
+#    triggered on `push`, but refresh.yml pushes using the default GITHUB_TOKEN,
+#    and GitHub does not run workflows for GITHUB_TOKEN-authored pushes. So the
+#    Pages site only ever updated when a human pushed — it has been serving data
+#    older than the last cron run. (Vercel is not subject to this: its GitHub App
+#    consumes push webhooks, which do fire for GITHUB_TOKEN pushes.)
+#
+# 2. Leaving it on `push` would publish a second, competing copy of the site that
+#    silently diverges from the Vercel deployment. Two live URLs for one dataset
+#    is exactly the provenance problem this project exists to avoid.
+#
+# workflow_dispatch is retained so there is a tested fallback publisher while the
+# Vercel path is being confirmed. Once Vercel has survived a few scheduled
+# refreshes, delete this file and turn Pages off in Settings → Pages.
 
 name: deploy pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'web/**'
-      - 'data/derived/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:

@@ -1,19 +1,22 @@
-import { loadAll } from './data.js';
+// Wiring.
+//
+// State is now six fields. It was: sectors Set, statuses Set, minCost, half,
+// showCorridors, hideVague, spin, selected - driving 29 controls whose combined
+// effect nobody could predict. The filter model is one three-way view plus one
+// opt-in layer.
+
+import { loadCore, loadLattice, detailFor, primeDetails, groupLocated, groupStates } from './data.js';
 import { createGlobe } from './globe.js';
 import { renderPanel } from './panel.js';
-import { STATUS_COLOR, STATUS_LABEL, SECTOR_LABEL } from './config.js';
-import { crore, dateTime, esc } from './format.js';
+import { BUCKET_COLOR, BUCKET_LABEL, BUCKET_ORDER } from './config.js';
+import { crore, dateTime, esc, num } from './format.js';
 
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  rows: [], arcs: [], details: {}, meta: null,
-  half: 'all',                 // all | building | contested | blocked
-  sectors: new Set(),          // empty = all
-  statuses: new Set(),         // empty = all
-  minCost: 0,
-  showCorridors: true,
-  hideVague: false,
+  rows: [], meta: null, asOf: 0,
+  view: 'all',        // all | past_due | stopped
+  showOpen: false,    // the 1,122 already-open projects, opt-in
   selected: null,
 };
 
@@ -22,209 +25,250 @@ let globe = null;
 boot();
 
 async function boot() {
-  const status = $('boot-status');
   try {
-    const data = await loadAll((m) => { status.textContent = m; });
-    Object.assign(state, data);
+    const core = await loadCore();
+    Object.assign(state, core);
 
-    status.textContent = 'Building the globe…';
-    globe = await createGlobe($('globe'), { onSelect: select });
-    globe.onSpinStop = () => { $('toggle-spin').checked = false; };
+    globe = createGlobe($('globe'), { onSelect: select, onSelectState: selectGroup });
 
     buildChrome();
     apply();
 
+    // Reveal the chrome, then drop the pitch card. Deliberately NOT gated on
+    // requestAnimationFrame: rAF does not fire in a background tab, so a visitor
+    // who opens the site in a new tab and switches to it later would find it
+    // still showing the loading card.
+    document.querySelector('.topbar').removeAttribute('hidden');
+    $('viewbar').hidden = false;
     $('boot').classList.add('gone');
-    setTimeout(() => { $('boot').hidden = true; }, 700);
-    for (const id of ['filters', 'legend', 'footer']) $(id).hidden = false;
-    document.querySelector('.topbar').hidden = false;
+    setTimeout(() => { $('boot').hidden = true; }, 650);
+    globe.settle();
+
+    // Texture and richer records, both after the marks are on screen.
+    loadLattice().then((arcs) => globe.setLattice(arcs));
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
+    idle(() => primeDetails());
+
+    window.addEventListener('popstate', () => {
+      const id = location.hash.slice(1);
+      id ? select(id, true) : closePanel(true);
+    });
+    if (location.hash.length > 1) select(location.hash.slice(1), true);
   } catch (err) {
     console.error(err);
-    window.__bootError = (err && (err.stack || err.message)) || String(err);
     $('boot').hidden = true;
     $('fatal').hidden = false;
-    $('fatal-body').innerHTML =
-      esc(err.message || String(err)) +
-      '<br><br>If you opened this file directly from disk, ES modules and ' +
-      '<code>fetch</code> are blocked by the browser. Serve it instead:<br>' +
-      '<code>python3 -m http.server 8000</code> from the repository root, then ' +
-      'open <code>http://localhost:8000/web/</code>.';
+    $('fatal-body').innerHTML = esc(err.message || String(err)) +
+      '<br><br>If you opened this file directly from disk, ES modules and <code>fetch</code> are ' +
+      'blocked by the browser. Serve it instead: <code>python3 -m http.server 8777</code> from the ' +
+      'repository root, then open <code>http://localhost:8777/web/</code>.';
   }
 }
 
-// ---------- chrome ----------
+// ---------------------------------------------------------------------------
+// The census. These four numbers partition the drawn set exactly, which is what
+// lets them sit side by side without reading as a false partition. They are
+// computed here, never hardcoded in markup, so they cannot ship stale.
+function census() {
+  const c = { past_due: 0, stopped: 0, on_schedule: 0, no_date: 0, open: 0, unstated: 0 };
+  for (const r of state.rows) {
+    if (r.lifecycle === 'open') c.open++;
+    else if (r.lifecycle === 'unstated') c.unstated++;
+    else c[r.bucket]++;
+  }
+  c.drawn = c.past_due + c.stopped + c.on_schedule + c.no_date;
+  c.building = c.past_due + c.on_schedule + c.no_date;
+  return c;
+}
 
 function buildChrome() {
-  const m = state.meta;
+  const c = census();
 
-  $('topstats').innerHTML = `
-    <div class="topstat"><div class="n">${m.counts.published}</div><div class="k">Projects</div></div>
-    <div class="topstat blocked"><div class="n">${m.counts.blocked}</div><div class="k">Halted</div></div>
-    <div class="topstat"><div class="n">${crore(totalCost(state.rows)) || '—'}</div><div class="k">Tracked value</div></div>`;
+  $('boot-counts').textContent =
+    `${num(c.building)} being built right now. ${num(c.past_due)} are already past the completion date their own source publishes.`;
 
-  chips($('sector-chips'), m.by_sector, SECTOR_LABEL, state.sectors, null);
-  chips($('status-chips'), m.by_status, STATUS_LABEL, state.statuses, STATUS_COLOR);
+  // The key row IS the legend. There is no separate legend box, so the colour
+  // key can never be hidden on mobile the way the old one was.
+  $('key').innerHTML = BUCKET_ORDER.map((b) => `
+    <span class="key-item"><span class="dot" style="background:${BUCKET_COLOR[b]}"></span>
+    <b>${num(c[b])}</b> ${esc(BUCKET_LABEL[b])}</span>`).join('');
 
-  $('legend').innerHTML =
-    Object.entries(m.by_status).map(([s]) => `
-      <span class="li"><span class="dot" style="background:${STATUS_COLOR[s] || '#666'}"></span>
-      ${esc(STATUS_LABEL[s] || s)}</span>`).join('') +
-    `<span class="note">Spike height is project cost on a log scale.
-     Pulsing rings mark blocked or stalled projects. Arcs are corridor projects,
-     drawn as straight lines between endpoints, not real alignments.</span>`;
-
-  const src = (m.sources || []).map((s) =>
-    `<a href="${esc(s.source_url)}" target="_blank" rel="noopener noreferrer">${esc(s.source_name)}</a>`
-  ).join(' · ');
-  $('footer').innerHTML = `
-    <span>Data generated ${esc(dateTime(m.generated_at))}</span>
-    <span class="sep">|</span><span>Sources: ${src}</span>
-    <span class="sep">|</span><span>${esc(m.disclaimer)}</span>`;
-
-  // events
-  document.querySelectorAll('.seg button').forEach((b) => {
+  // Naming the universe first ("All 707") stops the two subset options reading
+  // as peers that should be added together.
+  const segs = [
+    { k: 'all', label: `All ${num(c.drawn)}`, dot: null },
+    { k: 'past_due', label: `Past due ${num(c.past_due)}`, dot: BUCKET_COLOR.past_due },
+    { k: 'stopped', label: `Stopped ${num(c.stopped)}`, dot: BUCKET_COLOR.stopped },
+  ];
+  $('seg').innerHTML = segs.map((s) => `
+    <button role="radio" aria-checked="${s.k === state.view}" data-view="${s.k}"
+      class="${s.k === state.view ? 'on' : ''}">
+      ${s.dot ? `<span class="dot" style="background:${s.dot}"></span>` : ''}${esc(s.label)}
+    </button>`).join('');
+  $('seg').querySelectorAll('[data-view]').forEach((b) =>
     b.addEventListener('click', () => {
-      document.querySelectorAll('.seg button').forEach((x) => x.classList.remove('on'));
-      b.classList.add('on');
-      state.half = b.dataset.half;
+      state.view = b.dataset.view;
+      $('seg').querySelectorAll('[data-view]').forEach((x) => {
+        const on = x.dataset.view === state.view;
+        x.classList.toggle('on', on);
+        x.setAttribute('aria-checked', String(on));
+      });
       apply();
-    });
-  });
-  $('cost-range').addEventListener('input', (e) => {
-    state.minCost = +e.target.value;
-    $('cost-label').textContent = state.minCost ? `at least ${crore(state.minCost)}` : 'Any size';
+    }));
+
+  $('caveat').textContent =
+    'Past due means past the completion date the source itself publishes. No original sanction date exists, so this is not slip against a baseline.';
+
+  const openBtn = $('toggle-open');
+  openBtn.textContent = `+ Show the ${num(c.open)} already open`;
+  openBtn.addEventListener('click', () => {
+    state.showOpen = !state.showOpen;
+    openBtn.setAttribute('aria-pressed', String(state.showOpen));
+    openBtn.textContent = `${state.showOpen ? '−' : '+'} ${state.showOpen ? 'Hide' : 'Show'} the ${num(c.open)} already open`;
     apply();
   });
-  $('toggle-corridors').addEventListener('change', (e) => { state.showCorridors = e.target.checked; apply(); });
-  $('toggle-vague').addEventListener('change', (e) => { state.hideVague = e.target.checked; apply(); });
-  $('toggle-spin').addEventListener('change', (e) => globe.setSpin(e.target.checked));
-  $('reset').addEventListener('click', reset);
-  $('filters-toggle').addEventListener('click', () => {
-    const body = $('filters-body');
-    body.hidden = !body.hidden;
-    $('filters-toggle').setAttribute('aria-expanded', String(!body.hidden));
-  });
 
+  $('about-btn').addEventListener('click', openAbout);
+  $('scrim').addEventListener('click', closeAll);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
   wireSearch();
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closePanel(); $('suggest').hidden = true; }
-  });
 }
 
-function chips(host, counts, labels, set, colors) {
-  host.innerHTML = Object.entries(counts).map(([k, n]) => `
-    <button class="chip" data-k="${esc(k)}">
-      ${colors ? `<span class="dot" style="background:${colors[k] || '#666'}"></span>` : ''}
-      ${esc(labels[k] || k)} <span class="cnt">${n}</span>
-    </button>`).join('');
-  host.querySelectorAll('.chip').forEach((c) => {
-    c.addEventListener('click', () => {
-      const k = c.dataset.k;
-      if (set.has(k)) { set.delete(k); c.classList.remove('on'); }
-      else { set.add(k); c.classList.add('on'); }
-      apply();
-    });
-  });
-}
-
-function reset() {
-  state.half = 'all'; state.sectors.clear(); state.statuses.clear();
-  state.minCost = 0; state.hideVague = false; state.showCorridors = true;
-  document.querySelectorAll('.chip.on').forEach((c) => c.classList.remove('on'));
-  document.querySelectorAll('.seg button').forEach((b) =>
-    b.classList.toggle('on', b.dataset.half === 'all'));
-  $('cost-range').value = 0; $('cost-label').textContent = 'Any size';
-  $('toggle-vague').checked = false; $('toggle-corridors').checked = true;
-  globe.home();
-  apply();
-}
-
-// ---------- filtering ----------
-
+// ---------------------------------------------------------------------------
 function visible() {
   return state.rows.filter((r) => {
-    // Three distinct things, deliberately not conflated:
-    //   halted    - the project has stopped (stalled/rejected/cancelled/withdrawn)
-    //   contested - still officially proceeding, but carries a recorded
-    //               obstruction: litigation, a clearance fight, land trouble
-    //   building  - proceeding with nothing flagged against it
-    const contested = !!r.block_reason && !r.is_blocked;
-    if (state.half === 'building' && (r.is_blocked || contested)) return false;
-    if (state.half === 'blocked' && !r.is_blocked) return false;
-    if (state.half === 'contested' && !contested) return false;
-    if (state.sectors.size && !state.sectors.has(r.sector)) return false;
-    if (state.statuses.size && !state.statuses.has(r.status)) return false;
-    if (state.minCost && (r.cost_inr_crore || 0) < state.minCost) return false;
-    if (state.hideVague && r.geo_confidence === 'state') return false;
+    if (r.lifecycle === 'unstated') return false;
+    if (r.lifecycle === 'open') return state.showOpen;
+    if (state.view === 'past_due') return r.bucket === 'past_due';
+    if (state.view === 'stopped') return r.bucket === 'stopped';
     return true;
   });
 }
 
 function apply() {
   const rows = visible();
-  globe.setPoints(rows);
-  const ids = new Set(rows.map((r) => r.id));
-  globe.setArcs(state.showCorridors ? state.arcs.filter((a) => ids.has(a.id)) : []);
+  globe.setPoints(groupLocated(rows));
+  globe.setStates(groupStates(rows));
 
-  const first = $('topstats').querySelector('.topstat .n');
-  if (first) first.textContent = rows.length;
-  const val = $('topstats').querySelectorAll('.topstat .n')[2];
-  if (val) val.textContent = crore(totalCost(rows)) || '—';
-  const blk = $('topstats').querySelectorAll('.topstat .n')[1];
-  if (blk) blk.textContent = rows.filter((r) => r.is_blocked).length;
+  // One keyboard- and screen-reader-navigable path to the same set the globe is
+  // showing. The canvas alone offered none.
+  $('a11y-list').innerHTML = rows.slice(0, 300).map((r) =>
+    `<li><button data-goto="${esc(r.id)}">${esc(r.title)} — ${esc(BUCKET_LABEL[r.bucket] || r.bucket)}</button></li>`).join('');
+  $('a11y-list').querySelectorAll('[data-goto]').forEach((b) =>
+    b.addEventListener('click', () => select(b.dataset.goto)));
 }
 
-function totalCost(rows) {
-  const t = rows.reduce((a, r) => a + (r.cost_inr_crore || 0), 0);
-  return t > 0 ? t : null;
-}
-
-// ---------- selection ----------
-
-function select(id) {
-  state.selected = id;
+// ---------------------------------------------------------------------------
+async function select(id, fromHistory) {
   const row = state.rows.find((r) => r.id === id);
-  const detail = state.details[id];
-  if (row) globe.focus(row);
-  renderPanel($('panel'), detail, closePanel);
+  if (!row) return;
+  state.selected = id;
+  globe.focus(row);
+  renderPanel($('panel'), { kind: 'project', row, detail: null }, { onClose: closePanel, onSelect: select });
+  if (!fromHistory) history.pushState({ id }, '', '#' + id);
+  const detail = await detailFor(id);
+  if (state.selected === id) {
+    renderPanel($('panel'), { kind: 'project', row, detail }, { onClose: closePanel, onSelect: select });
+  }
 }
 
-function closePanel() {
+function selectGroup(v) {
+  const g = v.stack || v.state;
+  const heading = v.stack ? `${g.n} projects at this point` : `${g.n} projects in ${g.state}`;
+  const sub = v.stack
+    ? 'These share one published coordinate.'
+    : 'The source names the state but publishes no coordinates, so these are not drawn at any point.';
   state.selected = null;
-  renderPanel($('panel'), null);
+  renderPanel($('panel'), { kind: 'list', heading, sub, members: g.members },
+    { onClose: closePanel, onSelect: select });
 }
 
-// ---------- search ----------
+function closePanel(fromHistory) {
+  state.selected = null;
+  renderPanel($('panel'), null, {});
+  if (!fromHistory && location.hash) history.pushState({}, '', location.pathname);
+}
 
+function closeAll() {
+  closePanel();
+  $('sheet').hidden = true;
+  $('scrim').hidden = true;
+}
+
+// ---------------------------------------------------------------------------
+function openAbout() {
+  const c = census();
+  const m = state.meta;
+  const costKnown = state.rows.filter((r) => r.lifecycle === 'building' && r.cost_inr_crore).length;
+  const value = state.rows.filter((r) => r.lifecycle === 'building')
+    .reduce((a, r) => a + (r.cost_inr_crore || 0), 0);
+  const sources = (m.sources || []).map((s) =>
+    `<a href="${esc(s.source_url)}" target="_blank" rel="noopener noreferrer">${esc(s.source_name)}</a>`).join(' · ');
+
+  $('sheet').innerHTML = `
+    <button class="close" aria-label="Close">&times;</button>
+    <h2 id="sheet-title" tabindex="-1">About &amp; sources</h2>
+
+    <h3>What this is</h3>
+    <p>A tracker for Indian public infrastructure, built from government records. Every project
+    carries the source it came from, a link to it, and the timestamp we fetched it.</p>
+
+    <h3>What we count today</h3>
+    <p>${num(state.rows.length)} projects: ${num(c.building)} being built, ${num(c.stopped)} stopped,
+    ${num(c.open)} already open, and ${num(c.unstated)} whose status the source does not state.
+    Value of work in progress: ${esc(crore(value))} — cost is published for ${num(costKnown)} of ${num(c.building)}.</p>
+
+    <h3>What we cannot tell you yet</h3>
+    <ul>
+      <li>How far a project has slipped from its original plan. The sources here publish a current
+      completion date and no original sanctioned date, so slip is not computable.</li>
+      <li>Cost overrun. No source here publishes an original sanctioned cost.</li>
+      <li>Where ${num(state.rows.filter((r) => r.geo_confidence === 'state').length)} projects
+      actually are. The source names a state and no coordinates, so they are drawn as a circle over
+      the state with a count, never as a point.</li>
+      <li>What changed over time. Change tracking begins on the second pipeline run.</li>
+    </ul>
+
+    <h3>Coverage</h3>
+    <p>This is not yet a picture of all Indian infrastructure. Most of it is national-highway
+    contracts, plus a small number of hand-checked flagship projects marked
+    <em>Unverified seed data</em>.</p>
+
+    <h3>Sources</h3>
+    <p>${sources}</p>
+    <p class="note-sm">Data generated ${esc(dateTime(m.generated_at))}. ${esc(m.disclaimer || '')}</p>`;
+  $('sheet').hidden = false;
+  $('scrim').hidden = false;
+  $('sheet').querySelector('.close').addEventListener('click', closeAll);
+  $('sheet').querySelector('#sheet-title').focus();
+}
+
+// ---------------------------------------------------------------------------
 function wireSearch() {
   const input = $('search');
   const box = $('suggest');
+  input.placeholder = `Search ${num(state.rows.length)} projects…`;
 
   input.addEventListener('input', () => {
     const q = input.value.trim().toLowerCase();
     if (q.length < 2) { box.hidden = true; return; }
-    const hits = state.rows
-      .filter((r) => r.title.toLowerCase().includes(q) ||
-                     (r.state || '').toLowerCase().includes(q))
-      .slice(0, 12);
-    if (!hits.length) {
-      box.innerHTML = '<button disabled style="color:#64708a">No match</button>';
-      box.hidden = false;
-      return;
-    }
-    box.innerHTML = hits.map((r) => `
-      <button data-id="${esc(r.id)}">${esc(r.title)}
-        <span class="s-sector">${esc(SECTOR_LABEL[r.sector] || r.sector)} · ${esc(r.state || '')}</span>
-      </button>`).join('');
+    // Searches every row, including the already-open ones the globe is not
+    // drawing - so nothing in the corpus is unreachable.
+    const hits = state.rows.filter((r) =>
+      r.title.toLowerCase().includes(q) || (r.state || '').toLowerCase().includes(q)).slice(0, 10);
+    box.innerHTML = hits.length
+      ? hits.map((r) => `<button role="option" data-id="${esc(r.id)}">${esc(r.title)}
+          <span class="s-meta"><span class="dot" style="background:${BUCKET_COLOR[r.bucket]}"></span>
+          ${esc(r.state || '')}</span></button>`).join('')
+      : '<div class="s-empty">No match</div>';
     box.hidden = false;
-    box.querySelectorAll('button[data-id]').forEach((b) => {
-      b.addEventListener('click', () => {
-        select(b.dataset.id);
-        box.hidden = true;
-        input.value = '';
-      });
-    });
+    box.querySelectorAll('[data-id]').forEach((b) =>
+      b.addEventListener('click', () => { select(b.dataset.id); box.hidden = true; input.value = ''; }));
   });
 
-  input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 180));
+  // focusout, not blur+timeout: the old version display:none'd the element that
+  // held focus, so tabbing into a result closed the list.
+  document.querySelector('.search-wrap').addEventListener('focusout', (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) box.hidden = true;
+  });
 }

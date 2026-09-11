@@ -39,22 +39,29 @@ three months and the toolchain no longer installs.
 
 ---
 
-## The two halves
+## What you see
 
-The product is one question asked in two directions.
+One globe, one question: **what is India building, and how much of it is already
+past the completion date the government's own records publish?**
 
-| | What it shows | Where it comes from |
-|---|---|---|
-| **Being built** | Projects under construction, their cost, their schedule, how far behind they are | Project monitoring reports, agency dashboards, tender awards |
-| **Contested** | Projects officially proceeding but carrying a recorded obstruction — litigation, a clearance fight, land trouble | Clearance registers, tribunal orders, delay-reason fields |
-| **Halted** | Projects stopped, rejected, withdrawn or cancelled | Clearance rejections, quashed notifications, stalled-project reports |
+The interface is four numbers and one switch. The key row is a census that sums
+to the drawn total, so the counts can never be read as a false partition:
 
-Keeping *contested* separate from *halted* matters. A project can be actively
-under construction and simultaneously the subject of a Supreme Court challenge.
-Collapsing those into one "blocked" bucket would be the kind of small
-dishonesty that makes a data product untrustworthy.
+| | |
+|---|---|
+| **past due** | past the completion date its source publishes today |
+| **stopped** | halted, cancelled, or carrying a recorded obstruction |
+| **on schedule** | a completion date is published and is still in the future |
+| **no date published** | the source publishes no completion date at all |
 
----
+Height on the globe is **months past due**, not cost — anything not overdue is a
+flat puck, so the globe's entire vertical relief is lateness. Radius is how many
+projects share one published coordinate. Finished projects are off by default
+behind a single opt-in link.
+
+Projects whose location is known only to state level are **not drawn as points**.
+They are a dashed circle over the state with a count, because a point would claim
+a precision the source does not publish.
 
 ## Can this be real-time?
 
@@ -107,6 +114,7 @@ rather than inventing architecture.
   currently flaky server-side; see SOURCES.md for the workaround)
 - ⬜ Real corridor geometry for railways/metro (currently straight lines
   between endpoints; roads already use NHAI's own published alignment points)
+- ⬜ A second real adapter — at 98% roads, sector filtering is not yet worth a control
 - ⬜ Vector tiles, once the dataset outgrows plain GeoJSON
 
 43 hand-curated projects ship as seed data, tagged `unverified` and badged in
@@ -187,3 +195,40 @@ The highest-value contribution is a **new adapter** for a real source. See
 
 Code: [MIT](LICENSE). Data: belongs to whoever published it — see
 [`docs/LEGAL.md`](docs/LEGAL.md).
+
+---
+
+## Deploying
+
+The site is static: no server, no build step of its own, no npm. Vercel's
+"build" is two `cp` commands that flatten `web/` to the site root and place
+`data/derived/` beside it.
+
+```bash
+# Reproduce exactly what Vercel will serve, locally:
+rm -rf .vercel-site && mkdir -p .vercel-site/data \
+  && cp -R web/. .vercel-site/ && cp -R data/derived .vercel-site/data/derived
+python3 -m http.server -d .vercel-site 8000
+```
+
+If that renders at `http://localhost:8000/`, it will render on Vercel — it is
+the same tree.
+
+To deploy: import the repo at vercel.com/new, Framework Preset **Other**, and
+**leave Root Directory blank**. Setting it to `web` is the intuitive move and it
+breaks the site irrecoverably — Vercel cannot access files outside the root
+directory, so `data/derived/` would not exist in the deployment and every fetch
+would 404.
+
+**Keeping the deployed data fresh.** Vercel gates deployments on commit-author
+identity: on the Hobby plan only the account owner can trigger one. The daily
+refresh in `.github/workflows/refresh.yml` commits as a bot, so it may push
+successfully and never deploy — the site would look fine while its data quietly
+froze. The fix is a deploy hook: create one under Project Settings → Git →
+Deploy Hooks for `main`, store the URL as the repo secret
+`VERCEL_DEPLOY_HOOK`, and the workflow's last step will trigger it. Verify on
+day one that a deployment appears for a "data: scheduled refresh" commit.
+
+GitHub Pages (`.github/workflows/pages.yml`) is retained as a manual fallback
+only; its automatic trigger has been removed so it cannot publish a competing,
+diverging copy.
