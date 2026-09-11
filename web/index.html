@@ -3,79 +3,65 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Untitled: Infra Tracker — what India is building, and what it isn't</title>
-<meta name="description" content="A globe of India's public infrastructure projects, built from government sources, with provenance on every number.">
+<title>Untitled: Infra Tracker — what India is building, and how late it is</title>
+<meta name="description" content="India's public infrastructure projects on a 3D globe, built from government records, with the source and retrieval date attached to every figure.">
 <link rel="stylesheet" href="css/app.css">
+<!-- One self-contained UMD bundle (three.js inlined). This replaced a 150-request
+     esm.sh module graph that took 5.3s before anything could render. -->
+<script src="vendor/globe.gl-2.46.2.min.js"></script>
 </head>
 <body>
 
-<div id="globe" role="application" aria-label="3D globe of infrastructure projects"></div>
+<main id="globe" aria-label="3D globe of Indian infrastructure projects"></main>
 
+<!-- First paint, no JS required. Counts are deliberately NOT baked in here:
+     they are filled from meta.json at runtime so they can never ship stale. -->
 <div id="boot" class="boot">
   <div class="boot-inner">
-    <div class="boot-mark">◆</div>
     <div class="boot-title">Untitled: Infra Tracker</div>
-    <div class="boot-status" id="boot-status">Loading globe…</div>
+    <p class="boot-pitch">
+      Indian public infrastructure, built from government records.
+      <span id="boot-counts" class="boot-counts"></span>
+    </p>
+    <p class="boot-sub">Every figure carries its source and the date we fetched it.</p>
+    <div class="boot-rule"><span></span></div>
   </div>
 </div>
 
 <header class="topbar" hidden>
   <div class="brand">
-    <span class="brand-mark">◆</span>
-    <span class="brand-name">Untitled: Infra Tracker</span>
-    <span class="brand-tag">what India is building, and what it isn't</span>
+    <h1 class="brand-name">Untitled: Infra Tracker</h1>
+    <p class="brand-tag">India's public infrastructure, with its paperwork attached</p>
   </div>
-  <div class="topstats" id="topstats"></div>
-  <div class="search-wrap">
-    <input id="search" type="search" placeholder="Search projects…" autocomplete="off"
-           aria-label="Search projects" spellcheck="false">
-    <div id="suggest" class="suggest" hidden></div>
+  <div class="topbar-tools">
+    <div class="search-wrap">
+      <input id="search" type="search" placeholder="Search projects…" autocomplete="off"
+             aria-label="Search projects" spellcheck="false">
+      <div id="suggest" class="suggest" hidden role="listbox" aria-label="Search results"></div>
+    </div>
+    <button id="about-btn" class="ghost-btn">About &amp; sources</button>
   </div>
 </header>
 
-<aside class="filters" id="filters" hidden>
-  <button class="filters-toggle" id="filters-toggle" aria-expanded="true">Filters</button>
-  <div class="filters-body" id="filters-body">
-    <section>
-      <h3>Show</h3>
-      <div class="seg" role="group" aria-label="Project state">
-        <button data-half="all" class="on">Everything</button>
-        <button data-half="building">Being built</button>
-        <button data-half="contested">Contested</button>
-        <button data-half="blocked">Halted</button>
-      </div>
-    </section>
-    <section>
-      <h3>Sector</h3>
-      <div class="chips" id="sector-chips"></div>
-    </section>
-    <section>
-      <h3>Status</h3>
-      <div class="chips" id="status-chips"></div>
-    </section>
-    <section>
-      <h3>Minimum cost</h3>
-      <input type="range" id="cost-range" min="0" max="100000" step="1000" value="0">
-      <div class="range-label" id="cost-label">Any size</div>
-    </section>
-    <section class="toggles">
-      <label><input type="checkbox" id="toggle-corridors" checked> Show corridors</label>
-      <label><input type="checkbox" id="toggle-vague"> Hide state-centroid guesses</label>
-      <label><input type="checkbox" id="toggle-spin" checked> Auto-rotate</label>
-    </section>
-    <button class="reset" id="reset">Reset filters</button>
-  </div>
-</aside>
+<!-- The view bar is the only filter AND the entire legend. The key row is a census
+     that sums to the drawn total, so the numbers can never read as a false partition. -->
+<div class="viewbar" id="viewbar" hidden>
+  <div class="key" id="key"></div>
+  <div class="seg" id="seg" role="radiogroup" aria-label="Which projects to show"></div>
+  <p class="caveat" id="caveat"></p>
+  <button class="linky" id="toggle-open" aria-pressed="false"></button>
+</div>
 
-<div class="legend" id="legend" hidden></div>
+<aside class="panel" id="panel" hidden role="dialog" aria-modal="false" aria-labelledby="panel-title"></aside>
 
-<aside class="panel" id="panel" hidden aria-live="polite"></aside>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+<div class="scrim" id="scrim" hidden></div>
 
-<footer class="footer" id="footer" hidden></footer>
+<ul id="a11y-list" class="sr-only" aria-label="Projects currently shown"></ul>
 
 <div class="fatal" id="fatal" hidden>
   <div class="fatal-inner">
-    <h2 id="fatal-title">Could not start</h2>
+    <h2>Could not start</h2>
     <p id="fatal-body"></p>
   </div>
 </div>

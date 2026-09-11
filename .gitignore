@@ -18,4 +18,6 @@ venv/
 *.swp
 
 _site/
+.vercel-site/
+.vercel/
 node_modules/

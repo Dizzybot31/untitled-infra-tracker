@@ -98,3 +98,26 @@ jobs:
           CHANGED=$(git diff --cached --stat | tail -1)
           git commit -m "data: scheduled refresh" -m "$CHANGED"
           git push
+
+      # Vercel's Git integration gates deployments on commit-author identity: on
+      # the Hobby plan only the account owner can trigger one, and the commit
+      # email must match an email verified with the Git provider. The bot
+      # identity above satisfies neither, so the daily data commit may push
+      # successfully and never deploy — the data quietly freezes while the site
+      # looks fine. A deploy hook needs no auth header and bypasses that check.
+      #
+      # Create at: Vercel → Project Settings → Git → Deploy Hooks (branch: main),
+      # then store the URL as the repo secret VERCEL_DEPLOY_HOOK.
+      # The guard lives inside `run:` because the `secrets` context is not
+      # reliably available to step-level `if:` expressions.
+      - name: Trigger Vercel deploy
+        if: always()
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            echo "VERCEL_DEPLOY_HOOK not set — skipping deploy trigger." \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}")
+          echo "Deploy hook responded HTTP $code" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]

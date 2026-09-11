@@ -1,142 +1,137 @@
-import { CDN, TEXTURES, STATUS_COLOR } from './config.js';
+// The globe. Four colours, one height variable, one radius variable.
+//
+// Encoding changes from the previous version, and why:
+//   HEIGHT was cost on a log scale. The middle 50% of the cost distribution
+//     spanned an ~18% length difference, so it read as noise, and rows with no
+//     cost drew taller than the cheapest real project. Height is now months past
+//     due, which is the one quantity this product exists to show. Anything not
+//     overdue is a flat puck, so the globe's entire vertical relief IS lateness.
+//   RADIUS was constant, which made a stack of 15 co-located projects look like
+//     one. Radius is now stack size.
+//   COLOUR was 13 statuses, 90% of which fell into two near-identical greens.
+//     It is now four buckets that each mean exactly one thing.
+
+import { TEXTURES, BUCKET_COLOR } from './config.js';
 import { crore, esc } from './format.js';
 
-// India-centred opening view.
-const HOME = { lat: 21.5, lng: 79.0, altitude: 1.75 };
+const HOME = { lat: 20.2, lng: 79.5, altitude: 0.98 };
+const ENTRY = { lat: 20.2, lng: 79.5, altitude: 1.9 };
 
-// Cost drives spike height on a log scale: a ₹1 lakh crore corridor should read
-// as dramatically bigger than a ₹500 crore bypass without a linear scale making
-// everything else invisible.
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = window.matchMedia('(pointer: coarse)').matches;
+
 function altitudeFor(d) {
-  const c = d.cost_inr_crore;
-  if (!c || c <= 0) return 0.012;
-  return Math.min(0.42, 0.012 + Math.log10(c) * 0.038);
+  // 0 for everything on schedule; climbs to 0.22 at 60+ months overdue.
+  return 0.006 + Math.min(d.maxOverdue || 0, 60) / 60 * 0.15;
 }
 
-function colorFor(d) {
-  return STATUS_COLOR[d.status] || STATUS_COLOR.unknown;
+function radiusFor(d) {
+  const base = 0.20 + 0.12 * Math.sqrt(Math.max(0, (d.n || 1) - 1));
+  return coarse ? base * 1.7 : base;
 }
 
 function tooltip(d) {
-  const cost = crore(d.cost_inr_crore);
-  return `
-    <div style="font:13px -apple-system,sans-serif;background:rgba(8,12,20,.94);
-                border:1px solid rgba(255,255,255,.14);border-radius:9px;
-                padding:8px 10px;max-width:19rem;color:#e8edf6;
-                box-shadow:0 10px 30px rgba(0,0,0,.5)">
-      <div style="font-weight:600;line-height:1.35">${esc(d.title)}</div>
-      <div style="color:#96a2b8;font-size:11.5px;margin-top:3px">
-        ${esc(d.state || '')}${cost ? ' · ' + esc(cost) : ''}
-      </div>
-      <div style="color:${colorFor(d)};font-size:11px;margin-top:3px">
-        ${esc(String(d.status).replace(/_/g, ' '))}
-      </div>
-    </div>`;
+  const head = d.n > 1
+    ? `${d.n} projects at this point`
+    : esc(d.members[0].title);
+  const sub = d.n > 1
+    ? `tap to list them`
+    : [d.members[0].state, crore(d.members[0].cost_inr_crore)].filter(Boolean).map(esc).join(' · ');
+  const late = d.maxOverdue > 0
+    ? `<div style="color:${BUCKET_COLOR.past_due};font-size:11px;margin-top:3px">${d.maxOverdue} months past due</div>`
+    : '';
+  return `<div class="tip"><div class="tip-h">${head}</div><div class="tip-s">${sub}</div>${late}</div>`;
 }
 
-export async function createGlobe(el, { onSelect }) {
-  let Globe;
-  try {
-    Globe = (await import(CDN.globeGl)).default;
-  } catch (err) {
-    throw new Error(
-      `Could not load the globe library from ${CDN.globeGl}. ` +
-      `This page needs network access to that CDN on first load. (${err.message})`
-    );
+function stateTooltip(d) {
+  return `<div class="tip">
+    <div class="tip-h">${esc(d.state)}</div>
+    <div class="tip-s">${d.n} project${d.n === 1 ? '' : 's'} · location not published</div>
+    <div class="tip-s" style="margin-top:4px;max-width:17rem">The source names the state but
+      publishes no coordinates, so these are not drawn at any point.</div>
+  </div>`;
+}
+
+export function createGlobe(el, { onSelect, onSelectState }) {
+  const Globe = globalThis.Globe;
+  if (typeof Globe !== 'function') {
+    throw new Error('The globe library did not load. vendor/globe.gl-2.46.2.min.js is missing or failed to parse.');
   }
 
-  // globe.gl v2 supports both the constructor and the curried factory form.
-  let g;
-  try {
-    g = new Globe(el);
-  } catch {
-    g = Globe()(el);
-  }
-
-  g.globeImageUrl(TEXTURES.earthNight)
-    .bumpImageUrl(TEXTURES.bump)
-    .backgroundImageUrl(TEXTURES.sky)
-    .backgroundColor('#05070c')
+  const g = new Globe(el)
+    .globeImageUrl(TEXTURES.earthNight)
+    .backgroundColor('rgba(0,0,0,0)')   // the CSS starfield shows through; saves a 904 KB PNG
     .showAtmosphere(true)
     .atmosphereColor('#2f7fd4')
-    .atmosphereAltitude(0.19)
-    .pointOfView(HOME, 0);
+    .atmosphereAltitude(0.17)
+    .pointOfView(reduceMotion ? HOME : ENTRY, 0);
 
-  g.pointLat('lat').pointLng('lng')
-    .pointColor(colorFor)
+  // --- located work -------------------------------------------------------
+  g.pointsData([])
+    .pointLat('lat').pointLng('lng')
+    .pointColor((d) => BUCKET_COLOR[d.bucket])
     .pointAltitude(altitudeFor)
-    .pointRadius(0.22)
-    .pointsTransitionDuration(450)
+    .pointRadius(radiusFor)
+    .pointsTransitionDuration(0)
     .pointLabel(tooltip)
-    .onPointClick((d) => onSelect(d.id));
+    .onPointClick((d) => (d.n > 1 ? onSelectState({ stack: d }) : onSelect(d.members[0].id)));
 
-  // Halted projects pulse red; contested-but-proceeding ones pulse amber.
-  g.ringLat('lat').ringLng('lng')
-    .ringColor((d) => {
-      const [r, gr, b] = d.is_blocked ? [239, 64, 86] : [245, 165, 36];
-      return (t) => `rgba(${r},${gr},${b},${Math.max(0, 1 - t)})`;
-    })
-    .ringMaxRadius(3.2)
-    .ringPropagationSpeed(1.1)
-    .ringRepeatPeriod(1400);
+  // --- unlocated work, as flat rings on the sphere -------------------------
+  // Rings are used rather than DOM overlays so they foreshorten and occlude with
+  // the globe instead of floating over it like UI stuck on glass.
+  g.ringsData([])
+    .ringLat('lat').ringLng('lng')
+    .ringColor(() => () => BUCKET_COLOR.unlocated)
+    .ringMaxRadius((d) => Math.min(4.2, 1.1 + Math.sqrt(d.n) * 0.42))
+    .ringPropagationSpeed(0)
+    .ringRepeatPeriod(0)
+    .ringAltitude(0.0015);
 
-  g.arcStartLat('startLat').arcStartLng('startLng')
-    .arcEndLat('endLat').arcEndLng('endLng')
-    .arcColor((d) => {
-      const c = STATUS_COLOR[d.status] || STATUS_COLOR.unknown;
-      return [c + '00', c, c + '00'];
-    })
-    .arcStroke(0.45)
-    .arcAltitudeAutoScale(0.42)
-    .arcDashLength(0.55)
-    .arcDashGap(0.25)
-    .arcDashAnimateTime(3200)
-    .arcLabel((d) => tooltip(d))
-    .onArcClick((d) => onSelect(d.id));
+  // A second, clickable flat point sits at each state's centre so the disc is
+  // actually hittable - rings are not pickable in globe.gl.
+  g.customLayerData([]);
 
-  g.labelLat('lat').labelLng('lng')
-    .labelText('title')
-    .labelSize(0.42)
-    .labelDotRadius(0)
-    .labelColor(() => 'rgba(232,237,246,0.75)')
+  // --- labels for the state discs -----------------------------------------
+  g.labelsData([])
+    .labelLat('lat').labelLng('lng')
+    .labelText((d) => `${d.state} · ${d.n}`)
+    .labelSize(0.34)
+    .labelDotRadius((d) => Math.min(0.9, 0.3 + Math.sqrt(d.n) * 0.075))
+    .labelColor(() => 'rgba(190,202,222,0.72)')
+    .labelAltitude(0.004)
     .labelResolution(2)
-    .labelAltitude((d) => altitudeFor(d) + 0.006);
+    .onLabelClick((d) => onSelectState({ state: d }));
+
+  // --- the already-open network, as faint ground ---------------------------
+  g.arcsData([])
+    .arcStartLat('startLat').arcStartLng('startLng')
+    .arcEndLat('endLat').arcEndLng('endLng')
+    .arcColor(() => ['rgba(120,140,175,0.16)', 'rgba(120,140,175,0.16)'])
+    .arcStroke(0.16)
+    .arcAltitude(0.002)
+    .arcsTransitionDuration(0);
 
   const controls = g.controls();
-  controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.32;
+  controls.autoRotate = false;          // never spins; there is no toggle because there is no need
   controls.enableDamping = true;
-  controls.dampingFactor = 0.09;
-  controls.minDistance = 160;
-
-  // Stop spinning as soon as the user takes hold of the globe.
-  let userTook = false;
-  el.addEventListener('pointerdown', () => {
-    if (!userTook) { userTook = true; controls.autoRotate = false; api.onSpinStop && api.onSpinStop(); }
-  });
+  controls.dampingFactor = 0.1;
+  controls.minDistance = 150;
+  controls.maxDistance = 520;
 
   const resize = () => g.width(el.clientWidth).height(el.clientHeight);
   resize();
   window.addEventListener('resize', resize);
 
-  const api = {
+  return {
     globe: g,
-    onSpinStop: null,
-    setPoints(rows) {
-      g.pointsData(rows);
-      g.ringsData(rows.filter((r) => r.is_blocked || r.block_reason));
-      const labelled = [...rows]
-        .filter((r) => r.cost_inr_crore)
-        .sort((a, b) => b.cost_inr_crore - a.cost_inr_crore)
-        .slice(0, 10);
-      g.labelsData(labelled);
+    setPoints(marks) { g.pointsData(marks); },
+    setStates(states) { g.ringsData(states).labelsData(states); },
+    setLattice(arcs) { g.arcsData(arcs); },
+    // One easing move on load, then the camera stays put unless the user moves it.
+    settle() { if (!reduceMotion) g.pointOfView(HOME, 1500); },
+    focus(row) {
+      g.pointOfView({ lat: row.lat, lng: row.lng, altitude: 0.55 }, reduceMotion ? 0 : 800);
     },
-    setArcs(arcs) { g.arcsData(arcs); },
-    setSpin(on) { controls.autoRotate = on; },
-    focus(row, ms = 900) {
-      g.pointOfView({ lat: row.lat, lng: row.lng, altitude: 0.62 }, ms);
-    },
-    home(ms = 900) { g.pointOfView(HOME, ms); },
+    home() { g.pointOfView(HOME, reduceMotion ? 0 : 700); },
   };
-  return api;
 }
