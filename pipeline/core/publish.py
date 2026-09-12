@@ -20,10 +20,23 @@ OUT_DIR = os.path.join("data", "derived")
 FEATURE_FIELDS = (
     "id", "title", "sector", "status", "is_blocked", "block_reason",
     "cost_inr_crore", "progress_pct", "delay_months", "revised_completion_date",
+    # Published so the frontend can gate the slip figure per record: only some
+    # sources publish a baseline, and a missing slip must never read as "on time".
+    "original_completion_date", "cost_overrun_pct",
     # The source's own key. Published so the frontend can join a project to its
     # real road alignment in alignments.geojson, which is keyed on NHAI's upc.
     "native_id",
 )
+
+
+def _load_supersedes() -> Dict[str, Any]:
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ref",
+                        "paimana_supersedes.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh).get("supersedes") or {}
+    except (IOError, ValueError):
+        return {}
 
 
 def publish(records: List[Dict[str, Any]], changes: List[Dict[str, Any]],
@@ -31,13 +44,32 @@ def publish(records: List[Dict[str, Any]], changes: List[Dict[str, Any]],
             include_unverified: bool = True) -> Dict[str, Any]:
     os.makedirs(out_dir, exist_ok=True)
 
-    kept, dropped_no_geo, dropped_unverified = [], [], []
+    # A hand-entered seed is dropped once the real source carries the same
+    # project, so the two do not both appear on the globe.
+    supersedes = _load_supersedes()
+    present = {r["id"] for r in records}
+    by_native = {}
     for r in records:
+        if r.get("native_id"):
+            by_native[str(r["native_id"])] = r["id"]
+    superseded = set()
+    for seed_id, info in supersedes.items():
+        if seed_id in present and str(info.get("paimana_id")) in by_native:
+            superseded.add(seed_id)
+
+    kept, unlocated, dropped_unverified = [], [], []
+    for r in records:
+        if r["id"] in superseded:
+            continue
         if not include_unverified and "unverified" in (r.get("tags") or []):
             dropped_unverified.append(r["id"])
             continue
         if not ((r.get("geo") or {}).get("point")):
-            dropped_no_geo.append(r["id"])
+            # Previously dropped silently. These are real projects the sources
+            # simply do not place - mostly rail corridors crossing several states,
+            # where putting them on one state's dot would be a false claim. They
+            # are published as an explicit list and counted in every total.
+            unlocated.append(r)
             continue
         kept.append(r)
 
@@ -70,7 +102,12 @@ def publish(records: List[Dict[str, Any]], changes: List[Dict[str, Any]],
         "counts": {
             "published": len(kept),
             "total_in_store": len(records),
-            "dropped_no_geometry": len(dropped_no_geo),
+            "unlocated": len(unlocated),
+            "superseded": len(superseded),
+            "with_baseline": sum(1 for r in kept if r.get("original_completion_date")),
+            "slip_computable": sum(1 for r in kept if r.get("delay_months") is not None),
+            "by_source": _by_source(kept),
+            "dropped_no_geometry": 0,
             "dropped_unverified": len(dropped_unverified),
             "corridors": len(lines),
             "blocked": sum(1 for r in kept if r.get("is_blocked")),
@@ -99,6 +136,8 @@ def publish(records: List[Dict[str, Any]], changes: List[Dict[str, Any]],
            {"type": "FeatureCollection", "features": lines})
     _write(os.path.join(out_dir, "details.json"), details)
     _write(os.path.join(out_dir, "changes.json"), changes[:500])
+    _write(os.path.join(out_dir, "unlocated.json"),
+           [_unlocated_entry(r) for r in unlocated])
     _write(os.path.join(out_dir, "meta.json"), meta)
     return meta
 
@@ -120,6 +159,24 @@ def _detail(r: Dict[str, Any]) -> Dict[str, Any]:
     d["geo_method"] = geo.get("geo_method")
     d["geo_note"] = geo.get("geo_note")
     d["history"] = r.get("history") or []
+    return d
+
+
+def _by_source(records: List[Dict[str, Any]]) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    for r in records:
+        prov = r.get("provenance") or [{}]
+        k = prov[0].get("source_id") or "unknown"
+        out[k] = out.get(k, 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]))
+
+
+def _unlocated_entry(r: Dict[str, Any]) -> Dict[str, Any]:
+    d = _detail(r)
+    d["states"] = [t.split(":", 1)[1] for t in (r.get("tags") or []) if t.startswith("state:")]
+    d["why"] = ("crosses more than one state, so placing it on a single point would be a false claim"
+                if "multi_state" in (r.get("tags") or [])
+                else "no place name in the title that we could resolve")
     return d
 
 

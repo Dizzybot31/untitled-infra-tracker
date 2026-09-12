@@ -92,6 +92,44 @@ class TestPublishedPartition(unittest.TestCase):
             lon, lat = f["geometry"]["coordinates"]
             self.assertTrue(65 <= lon <= 98 and 5 <= lat <= 38, (p.get("id"), lon, lat))
 
+    def test_census_counts_reconcile(self):
+        c = self.meta["counts"]
+        self.assertEqual(
+            c["published"] + c.get("unlocated", 0) + c.get("superseded", 0),
+            c["total_in_store"],
+            "every stored record must be published, listed as unlocated, or superseded")
+
+    def test_no_cross_source_duplicate_titles(self):
+        """Standing guard against the PAIMANA/NHAI road double-count.
+
+        PAIMANA carries 993 road projects that are largely the same contracts
+        NHAI already publishes under a different spelling. Only its railways are
+        ingested today; the day someone adds roads without the title join, this
+        fails loudly instead of silently inflating every headline number.
+
+        Scoped to CROSS-source collisions on purpose. Within a single source,
+        that source's own key is authoritative and identical titles are legal:
+        NHAI really does publish three pairs of distinct contract packages that
+        share a title (e.g. N/07016/01001/BR and N/07016/01004/BR, "Balance Work
+        of Piprakothi-Motihari-Raxaul on NH-28A"). Those are different packages
+        of one stretch, not duplicates - the same principle ids.find_links()
+        already applies by refusing to merge within a source.
+        """
+        import re
+        seen = {}
+        for f in self.fc["features"]:
+            p = f["properties"]
+            title = p.get("title") or ""
+            key = re.sub(r"[^a-z0-9]", "", title.lower())
+            if not key:
+                continue
+            source = (p.get("id") or "").rsplit("-", 1)[0]
+            if key in seen and seen[key][0] != source:
+                self.fail("the same project appears under two sources: %r is published by "
+                          "both %s (%s) and %s (%s)"
+                          % (title, seen[key][0], seen[key][1], source, p.get("id")))
+            seen[key] = (source, p.get("id"))
+
     def test_meta_exposes_what_the_about_sheet_reads(self):
         for key in ("generated_at", "sources", "disclaimer", "counts", "vocab"):
             self.assertIn(key, self.meta)
@@ -147,16 +185,31 @@ class TestFrontendContract(unittest.TestCase):
             self.assertNotIn("https://esm.sh", src, name)
             self.assertNotIn("https://unpkg.com", src, name)
 
-    def test_delay_language_is_gone(self):
-        # The dataset supports "past the date the source publishes", not "slipped
-        # against a baseline". 10 of 1,849 rows have an original date.
+    def test_slip_language_is_gated_not_absent(self):
+        """Slip figures returned with PAIMANA, but only behind a guard.
+
+        Before PAIMANA no source published a baseline, so these figures were
+        removed outright. Now some records have one and most do not, which is a
+        sharper hazard: an absent slip figure must never read as "on schedule".
+        The rule is no longer "never mention slip" but "never mention it without
+        first checking this record has a baseline".
+        """
         for rel in ("js/format.js", "js/panel.js", "js/app.js"):
             with open(os.path.join(ROOT, "web", rel), encoding="utf-8") as fh:
                 src = _strip_js_comments(fh.read())
             self.assertNotIn("behind original schedule", src, rel)
             self.assertNotIn("delayText", src, rel)
-            self.assertNotIn("cost_overrun_pct", src, rel)
 
+        with open(os.path.join(ROOT, "web", "js", "panel.js"), encoding="utf-8") as fh:
+            panel = _strip_js_comments(fh.read())
+        if "delay_months" in panel:
+            self.assertIn("r.original_completion_date && r.delay_months", panel,
+                          "delay_months must be gated on the baseline existing")
+        if "cost_overrun_pct" in panel:
+            self.assertIn("!= null", panel,
+                          "cost_overrun_pct must be null-guarded before display")
+        self.assertIn("not the same as being on schedule", panel,
+                      "a missing slip figure must say what its absence means")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

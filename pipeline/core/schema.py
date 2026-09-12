@@ -143,12 +143,23 @@ def derive(rec: Dict[str, Any]) -> Dict[str, Any]:
     orig = rec.get("cost_original_inr_crore")
     cur = rec.get("cost_inr_crore")
     if isinstance(orig, (int, float)) and isinstance(cur, (int, float)) and orig > 0:
-        rec["cost_overrun_pct"] = round((cur - orig) / orig * 100.0, 1)
+        # A "revised" cost below half the original is the source disagreeing with
+        # itself, not a saving: Hubli-Ankola reports 5,174 crore sanctioned
+        # against a 533 crore revision while 10% built. Publishing "-90% below
+        # sanction" would assert something false. Show both figures, compute
+        # nothing - the same rule applied to inverted dates just below.
+        if cur < orig * 0.5:
+            rec["cost_overrun_pct"] = None
+        else:
+            rec["cost_overrun_pct"] = round((cur - orig) / orig * 100.0, 1)
 
     a, b = rec.get("original_completion_date"), rec.get("revised_completion_date")
     if a and b:
         months = _month_delta(a, b)
-        if months is not None:
+        # A revised date EARLIER than the original is the source contradicting
+        # itself, not negative slip. 9 of 149 PAIMANA railway rows do this. Show
+        # both dates and compute nothing; the adapter tags the row.
+        if months is not None and months >= 0:
             rec["delay_months"] = months
     return rec
 

@@ -25,6 +25,18 @@ legal advice; get real legal review before this handles meaningful traffic.
   prominent front-page link farm to the portal is not attempted. Get written
   confirmation from MoSPI's IPMD before this adapter goes into wide use.
 
+- **PAIMANA / MoSPI** (`paimana-proj.mospi.gov.in`): **no licence, no terms of
+  use, and no robots.txt exist anywhere on the site.** It asserts
+  "Copyright (c) 2025 Ministry of Statistics and Programme Implementation" and
+  publishes a hyperlink policy requesting prior permission before linking to it.
+  Stance taken: attribute MoSPI prominently on the About panel, state
+  non-affiliation explicitly, link only to the portal landing page (the source
+  has no per-project URL, so the whole site carries exactly one outbound link to
+  it), publish only the normalised derivative rather than mirroring the payload,
+  and keep raw responses out of git. A polite note to the IPMD stating what the
+  page does and asking about the hyperlink policy is worth sending; it is not a
+  blocker, but it is the right thing to do and should be filed here when sent.
+
 ## Personal data
 
 - The NHAI `Land_Arbitration_Plot_Layer` (124,621 land parcels) carries an

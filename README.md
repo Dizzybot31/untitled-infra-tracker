@@ -207,6 +207,13 @@ project rendering Indian territory.
 
 ---
 
+## Where this is going
+
+Parked ideas, with the reasoning and what has already been verified, live in
+[`docs/ROADMAP.md`](docs/ROADMAP.md). The next one up is making the site
+local-first — "what is being built near me" — which is waiting on better sector
+coverage rather than on any UI work.
+
 ## Contributing
 
 The highest-value contribution is a **new adapter** for a real source. See

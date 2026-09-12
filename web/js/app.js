@@ -17,6 +17,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   rows: [], meta: null, asOf: 0,
   alignments: new Map(),   // upc -> real road shape, loaded just after first paint
+  unlocated: [],           // real projects no source places; listed, never drawn
   view: 'all',        // all | past_due | stopped
   showOpen: false,    // the 1,122 already-open projects, opt-in
   selected: null,
@@ -53,6 +54,8 @@ async function boot() {
       apply();
     });
     loadLattice().then((arcs) => globe.setLattice(arcs));
+    fetch('../data/derived/unlocated.json').then((r) => r.json())
+      .then((u) => { state.unlocated = u; }).catch(() => { state.unlocated = []; });
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
     idle(() => primeDetails());
 
@@ -123,8 +126,9 @@ function buildChrome() {
       apply();
     }));
 
+  const withBaseline = state.rows.filter((r) => r.original_completion_date).length;
   $('caveat').textContent =
-    'Past due means past the completion date the source itself publishes. No original sanction date exists, so this is not slip against a baseline.';
+    `Past due means past the completion date the source publishes today. ${num(withBaseline)} of these also publish an original target date, so slip against that plan is shown on those and only those.`;
 
   const openBtn = $('toggle-open');
   openBtn.textContent = `+ Show the ${num(c.open)} already open`;
@@ -212,6 +216,8 @@ function closeAll() {
 function openAbout() {
   const c = census();
   const m = state.meta;
+  const total = state.rows.length;
+  const withBaseline = state.rows.filter((r) => r.original_completion_date).length;
   const costKnown = state.rows.filter((r) => r.lifecycle === 'building' && r.cost_inr_crore).length;
   const value = state.rows.filter((r) => r.lifecycle === 'building')
     .reduce((a, r) => a + (r.cost_inr_crore || 0), 0);
@@ -231,16 +237,40 @@ function openAbout() {
     ${num(c.open)} already open, and ${num(c.unstated)} whose status the source does not state.
     Value of work in progress: ${esc(crore(value))} — cost is published for ${num(costKnown)} of ${num(c.building)}.</p>
 
+    <h3>What we can now tell you, and for which projects</h3>
+    <p>MoSPI's project monitoring register publishes an original target date for every project it
+    carries. For the ${num(withBaseline)} projects here that come from it, we show slip against that
+    original plan, and cost against the original sanction where a revised cost has been published.
+    For the other ${num(total - withBaseline)} — almost all national-highway contracts — no source
+    publishes a baseline at all. Those show no slip figure, and that absence means we do not have
+    their original plan. <strong>It does not mean they are on schedule.</strong></p>
+    <p class="note-sm">"Original" is the date MoSPI records today. It is stable — it moved on about
+    8% of projects over a full year, against 53% for the revised date — and the movements we have
+    examined are corrections, including one obvious typo and several day/month transpositions.
+    Every such change is logged and shown in that project's history.</p>
+
     <h3>What we cannot tell you yet</h3>
     <ul>
-      <li>How far a project has slipped from its original plan. The sources here publish a current
-      completion date and no original sanctioned date, so slip is not computable.</li>
-      <li>Cost overrun. No source here publishes an original sanctioned cost.</li>
+      <li>How far the ${num(total - withBaseline)} projects without a baseline have slipped — their
+      sources publish a current completion date and no original one.</li>
+      <li>Cost overrun where no revised cost has been published. A missing revised cost means no
+      revision has been recorded, not that the cost is unchanged.</li>
       <li>Where ${num(state.rows.filter((r) => r.geo_confidence === 'state').length)} projects
       actually are. The source names a state and no coordinates, so they are drawn as a circle over
       the state with a count, never as a point.</li>
-      <li>What changed over time. Change tracking begins on the second pipeline run.</li>
+      <li>Why anything is late. No source here publishes a reason.</li>
     </ul>
+
+    ${state.unlocated.length ? `
+      <h3>${num(state.unlocated.length)} projects we cannot place</h3>
+      <p>These are counted in every total on this page but are drawn nowhere on the globe. Most are
+      rail corridors crossing two or more states, so putting them on one state's dot would be a
+      false claim; the rest carry no place name at all. We do not invent coordinates.</p>
+      <ul class="unlocated">
+        ${state.unlocated.slice(0, 40).map((u) => `<li>${esc(u.title)}${
+          u.states && u.states.length ? ` <span class="note-sm">— ${esc(u.states.join(', '))}</span>` : ''
+        }</li>`).join('')}
+      </ul>` : ''}
 
     <h3>Coverage</h3>
     <p>This is not yet a picture of all Indian infrastructure. Most of it is national-highway
@@ -249,7 +279,14 @@ function openAbout() {
 
     <h3>Sources</h3>
     <p>${sources}</p>
-    <p class="note-sm">Data generated ${esc(dateTime(m.generated_at))}. ${esc(m.disclaimer || '')}</p>`;
+    <p class="note-sm">Data generated ${esc(dateTime(m.generated_at))}. ${esc(m.disclaimer || '')}</p>
+    <p class="note-sm">Central-sector project cost, sanction and completion-date figures are
+    reproduced from PAIMANA, published by the Infrastructure &amp; Project Monitoring Division,
+    Ministry of Statistics and Programme Implementation, Government of India.
+    &copy; 2025 Ministry of Statistics and Programme Implementation. This site is not affiliated
+    with, endorsed by, or maintained by MoSPI or any Government of India body.</p>
+    <p class="note-sm">PAIMANA publishes one frozen monthly snapshot in arrears, so those figures
+    are from its most recently published month, which is not the same as this month.</p>`;
   $('sheet').hidden = false;
   $('scrim').hidden = false;
   $('sheet').querySelector('.close').addEventListener('click', closeAll);

@@ -1,11 +1,12 @@
 // The detail panel.
 //
-// The previous version promised capabilities the data does not have:
-//   - a cost_overrun_pct figure, non-null on 0 of 1,849 records
-//   - a delay_months alarm, populated on 9 (all hand-entered seed rows)
-//   - a "What changed" section whose empty state apologised at length
-// All three are gone. What replaces them is narrower and true: the completion
-// date the source publishes today, and how long ago it passed.
+// History: an earlier version promised slip and cost-overrun figures that no
+// source could populate, so both were removed. MoSPI's PAIMANA register now
+// publishes an original target date and an original sanctioned cost, so they
+// come back - but STRICTLY GATED PER RECORD. Most projects here still have no
+// baseline, and the absence of a slip figure must never read as "on schedule".
+// That is why the no-baseline case gets its own positively-stated sentence
+// rather than simply rendering nothing.
 //
 // Provenance and location-confidence are untouched and, on narrow screens, now
 // sit ABOVE the details block so they land in the first screenful.
@@ -72,16 +73,39 @@ function projectMarkup(v) {
 
   if (d && d.progress_pct != null) figures.push(fig('Physical progress', d.progress_pct + '%'));
 
+  // Only where the source actually publishes a baseline.
+  if (r.original_completion_date && r.delay_months > 0) {
+    figures.push(fig('Slip against original plan',
+      `${r.delay_months} months later than ${monthYear(r.original_completion_date)}`,
+      null, r.delay_months >= 12));
+  }
+  // The 1% floor is not cosmetic: many rows land inside it purely because the
+  // original cost is an integer and the revised cost a decimal.
+  const costInconsistent = d && (d.tags || []).includes('cost_figures_inconsistent');
+  if (costInconsistent && d.cost_original_inr_crore) {
+    figures.push(fig('Cost', crore(d.cost_inr_crore),
+      `${crore(d.cost_original_inr_crore)} originally sanctioned`, true));
+  }
+  const overrun = !costInconsistent && d && d.cost_overrun_pct;
+  if (overrun != null && Math.abs(overrun) >= 1 && d.cost_original_inr_crore) {
+    figures.push(fig(
+      overrun > 0 ? 'Cost above original sanction' : 'Cost below original sanction',
+      `${Math.abs(overrun)}%`,
+      `${crore(d.cost_original_inr_crore)} sanctioned, ${crore(d.cost_inr_crore)} now`,
+      overrun > 0));
+  }
+
   const blockHtml = (r.block_reason || (d && d.block_detail)) ? `
     <div class="p-block">
       <div class="k">${esc(BLOCK_REASON_LABEL[r.block_reason] || 'Obstruction')}</div>
       <div class="v">${esc((d && d.block_detail) || 'The source records an obstruction but gives no further detail.')}</div>
     </div>` : '';
 
-  const pastDueNote = r.bucket === 'past_due' ? `
-    <p class="note">This is the completion date the source publishes today. It does not publish an
-    original sanctioned date, so we cannot tell you how far this project has slipped — only that
-    this date has passed.</p>` : '';
+  const pastDueNote = scheduleNote(r, d)
+    + (costInconsistent ? `<p class="note">The source publishes an original cost of
+        ${esc(crore(d.cost_original_inr_crore))} and a current cost of ${esc(crore(d.cost_inr_crore))}.
+        We show both and calculate no overrun, because the two figures are not
+        consistent with each other at source.</p>` : '');
 
   const notDrawn = r.lifecycle === 'open' ? `
     <p class="note">Already open${r.revised_completion_date ? ' since ' + esc(monthYear(r.revised_completion_date)) : ''}
@@ -129,6 +153,39 @@ function projectMarkup(v) {
 
     ${facts.length ? `<h3>Details</h3><dl class="kv">${
       facts.map(([k, x]) => `<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join('')}</dl>` : ''}`;
+}
+
+// Five cases, because the honest thing to say differs in each and a blank must
+// never be mistaken for "fine".
+function scheduleNote(r, d) {
+  const orig = r.original_completion_date;
+  const rev = r.revised_completion_date;
+  const noRevised = d && (d.tags || []).includes('no_revised_date');
+  const inverted = d && (d.tags || []).includes('revised_earlier_than_original');
+
+  if (orig && inverted) {
+    return `<p class="note">The source publishes an original date of ${esc(monthYear(orig))} and a
+      revised date of ${esc(monthYear(rev))} — earlier than the original. We show both and
+      calculate nothing, because the source disagrees with itself.</p>`;
+  }
+  if (orig && noRevised) {
+    return `<p class="note">This is the original target date. The source has published no revised
+      date for this project, which is not the same as the project being on time.</p>`;
+  }
+  if (orig && r.delay_months > 0) {
+    return `<p class="note">Originally due ${esc(monthYear(orig))}. The source now publishes
+      ${esc(monthYear(rev))} — ${r.delay_months} months later than the original plan.</p>`;
+  }
+  if (orig) {
+    return `<p class="note">Originally due ${esc(monthYear(orig))}, and that is still the date the
+      source publishes. It has not been revised.</p>`;
+  }
+  // No baseline: the common case, and the one that must be stated out loud.
+  return `<p class="note">No original target date is published for this project, so there is no
+    slip figure — and that absence is not the same as being on schedule. ${
+      r.bucket === 'past_due'
+        ? 'We can tell you only that the date the source publishes today has passed.'
+        : 'We can show only the completion date the source publishes today.'}</p>`;
 }
 
 function fig(k, v, sub, alarm) {

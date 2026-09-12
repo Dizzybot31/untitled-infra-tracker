@@ -1,0 +1,23 @@
+{
+  "_note": "Seed records superseded by a PAIMANA record for the SAME real project. Hand-verified one by one on 2026-09-12 against the 2026-07 freeze; three rows do not justify an entity-resolution engine, they justify a checked-in file. PAIMANA wins because the seeds are hand-entered and tagged 'unverified'.",
+  "_rejected": {
+    "seed-376672a8c52d2125": "Eastern Dedicated Freight Corridor scored 0.60 against PAIMANA's 'Western Dedicated Freight Corridor' because token overlap ignores the one word that matters. PAIMANA carries only the Western corridor - verified by searching all 192 rail rows for 'freight' and 'dedicated'. Merging these would have deleted a real, distinct project from the map. This entry exists so nobody re-adds it."
+  },
+  "supersedes": {
+    "seed-6b2946bf67818196": {
+      "paimana_id": "705728",
+      "seed_title": "Mumbai-Ahmedabad High Speed Rail Corridor",
+      "paimana_title": "Mumbai-Ahmedabad High Speed Rail Project- 508 km"
+    },
+    "seed-3845676629d02979": {
+      "paimana_id": "705432",
+      "seed_title": "Sivok to Rangpo New Rail Line",
+      "paimana_title": "Sivok-Rangpo New Rail Line"
+    },
+    "seed-8eb04a3844ba1a5b": {
+      "paimana_id": "705237",
+      "seed_title": "Western Dedicated Freight Corridor",
+      "paimana_title": "Western Dedicated Freight Corridor"
+    }
+  }
+}

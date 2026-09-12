@@ -21,7 +21,8 @@ from . import schema
 # Fields whose changes we consider newsworthy enough to log and surface.
 TRACKED_FIELDS = (
     "title", "status", "status_detail", "block_reason",
-    "cost_inr_crore", "original_completion_date", "revised_completion_date",
+    "cost_inr_crore", "cost_original_inr_crore",
+    "original_completion_date", "revised_completion_date",
     "commissioned_date", "progress_pct", "executing_agency",
 )
 

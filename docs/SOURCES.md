@@ -33,6 +33,51 @@ Other layers on the same GeoServer, not yet wired up but confirmed live:
 LEGAL.md before touching this one), `india_nh`, and per-agency link-project
 layers for MoRTH-direct and NHIDCL works.
 
+### PAIMANA (MoSPI) — `mospi_paimana`
+**Verified live 2026-09-12.** `POST https://paimana-proj.mospi.gov.in/Home/GetTileData`
+with `Month`, `Year`, `MonthYear` and `SectorId=108` returns the Railways slice
+of MoSPI's central project-monitoring register. No key, no session, no CSRF.
+
+**Only Railways is ingested (192 rows).** The register also carries 993 "Roads &
+Highways" rows which are deliberately excluded: they are largely the same
+contracts NHAI already publishes under a different spelling. 489 of them match an
+existing NHAI title once punctuation is stripped, corroborated by cost agreeing
+within 2% and completion dates agreeing to the month on 489/489. Ingesting them
+naively would insert ~489 duplicate national highways and silently corrupt every
+headline count. `tests/test_published_view.py::test_no_cross_source_duplicate_titles`
+fails the build if that ever happens.
+
+**Why it matters more than 192 extra rows:** it publishes `OriginalEndDate` on
+100% of rows, which is the first baseline any source here has provided. Slip
+against the original plan is now computable and shown — on those records and
+only those.
+
+Traps, all measured:
+- Always send `Month`, `Year` **and** `MonthYear`. A missing or unparseable
+  `MonthYear` returns a deterministic HTTP 500 `maxJsonLength` error. A 500 here
+  means the *request* was malformed — do not retry it.
+- Never read `data.isLive` or `data.ProjectCount`. Both report False/0 on a
+  perfectly good 192-row response. Use `totalProjectsTabData[0].TotalProject`
+  and compare it to the row count.
+- `StateName` is null on every row. State is recovered by querying each
+  `StateId`, but that is a **many-to-many assignment, not a partition**: 54 of
+  192 projects appear under two or more states and the per-state counts sum to
+  250. Per-state calls assign state; they must never source rows.
+- The lookup endpoints (`GetStateList`, `GetSectorList`) have a reproducible
+  ~23 second stall, so their values are committed as reference data instead.
+- Only a rolling 13-month window exists, and the latest published month lags the
+  current one. Ask `/Home/GetFreezeDates` rather than assuming.
+- `DELAYED_TIME`, `COST_OVERRUN`, `COST_OVERRUN_PERC`, `COR_PERC`, `TOR_PERC`,
+  `RevisedDateReason`, `RevisedCostReason`, `Remarks` and `StateName` are exposed
+  but **zero or null on every row**. Five of them are named exactly like the
+  numbers you want. Compute delay and overrun yourself; never read these.
+
+**Licence: none stated.** The site asserts "Copyright (c) 2025 Ministry of
+Statistics and Programme Implementation" and carries a hyperlink policy
+requesting prior permission to link. There is no robots.txt and no terms of use.
+See `docs/LEGAL.md`; the site attributes MoSPI prominently, links only to the
+portal landing page, and states non-affiliation.
+
 ### Curated seed — `seed`
 Hand-entered, not fetched. Exists so the globe is not empty before more
 adapters land. Tagged `unverified` and badged in the UI. See
