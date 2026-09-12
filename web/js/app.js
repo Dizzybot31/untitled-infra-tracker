@@ -5,7 +5,8 @@
 // effect nobody could predict. The filter model is one three-way view plus one
 // opt-in layer.
 
-import { loadCore, loadLattice, detailFor, primeDetails, groupLocated, groupStates } from './data.js';
+import { loadCore, loadLattice, loadAlignments, buildPaths, detailFor, primeDetails,
+         groupLocated, groupStates } from './data.js';
 import { createGlobe } from './globe.js';
 import { renderPanel } from './panel.js';
 import { BUCKET_COLOR, BUCKET_LABEL, BUCKET_ORDER } from './config.js';
@@ -15,6 +16,7 @@ const $ = (id) => document.getElementById(id);
 
 const state = {
   rows: [], meta: null, asOf: 0,
+  alignments: new Map(),   // upc -> real road shape, loaded just after first paint
   view: 'all',        // all | past_due | stopped
   showOpen: false,    // the 1,122 already-open projects, opt-in
   selected: null,
@@ -44,7 +46,12 @@ async function boot() {
     setTimeout(() => { $('boot').hidden = true; }, 650);
     globe.settle();
 
-    // Texture and richer records, both after the marks are on screen.
+    // Road shapes and texture, both after the first marks are on screen so
+    // nothing delays the page being usable.
+    loadAlignments().then((byUpc) => {
+      state.alignments = byUpc;
+      apply();
+    });
     loadLattice().then((arcs) => globe.setLattice(arcs));
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
     idle(() => primeDetails());
@@ -147,7 +154,13 @@ function visible() {
 
 function apply() {
   const rows = visible();
-  globe.setPoints(groupLocated(rows));
+
+  // Anything with a real road shape is drawn as that road. Only the rest get a
+  // marker, so a project is never represented twice.
+  const paths = buildPaths(rows, state.alignments);
+  const drawnAsRoad = new Set(paths.map((p) => p.id));
+  globe.setPaths(paths);
+  globe.setPoints(groupLocated(rows.filter((r) => !drawnAsRoad.has(r.id))));
   globe.setStates(groupStates(rows));
 
   // One keyboard- and screen-reader-navigable path to the same set the globe is

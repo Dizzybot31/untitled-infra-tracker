@@ -20,6 +20,9 @@ OUT_DIR = os.path.join("data", "derived")
 FEATURE_FIELDS = (
     "id", "title", "sector", "status", "is_blocked", "block_reason",
     "cost_inr_crore", "progress_pct", "delay_months", "revised_completion_date",
+    # The source's own key. Published so the frontend can join a project to its
+    # real road alignment in alignments.geojson, which is keyed on NHAI's upc.
+    "native_id",
 )
 
 
