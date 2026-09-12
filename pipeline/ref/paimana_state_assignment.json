@@ -1,0 +1,644 @@
+{
+ "_note": "ProjectId -> states the project is registered under, recovered by querying each StateId because StateName is null on every row. Many-to-many: the per-state counts sum to more than the project count. Rebuilt only when the freeze month advances or an unseen project appears.",
+ "assignment": {
+  "400006": [
+   "Odisha"
+  ],
+  "400022": [
+   "Gujarat",
+   "Rajasthan"
+  ],
+  "400023": [
+   "Karnataka"
+  ],
+  "400045": [
+   "Odisha"
+  ],
+  "400047": [
+   "Odisha"
+  ],
+  "400048": [
+   "Odisha"
+  ],
+  "400203": [
+   "Chhattisgarh"
+  ],
+  "400204": [
+   "Uttar Pradesh"
+  ],
+  "400205": [
+   "Uttar Pradesh"
+  ],
+  "400220": [
+   "Chhattisgarh"
+  ],
+  "400223": [
+   "Tamil Nadu",
+   "Puducherry"
+  ],
+  "400232": [
+   "Odisha"
+  ],
+  "400247": [
+   "West Bengal"
+  ],
+  "400254": [
+   "Bihar"
+  ],
+  "400273": [
+   "West Bengal"
+  ],
+  "400275": [
+   "Andhra Pradesh",
+   "Tamil Nadu"
+  ],
+  "400280": [
+   "Tamil Nadu"
+  ],
+  "400291": [
+   "Chhattisgarh"
+  ],
+  "400298": [
+   "Andhra Pradesh"
+  ],
+  "400416": [
+   "Jharkhand"
+  ],
+  "602792": [
+   "Chhattisgarh"
+  ],
+  "602797": [
+   "West Bengal",
+   "Uttar Pradesh"
+  ],
+  "607653": [
+   "Punjab"
+  ],
+  "611669": [
+   "Bihar",
+   "Uttar Pradesh"
+  ],
+  "611751": [
+   "Maharashtra"
+  ],
+  "611752": [
+   "Andhra Pradesh"
+  ],
+  "611754": [
+   "Andhra Pradesh"
+  ],
+  "611855": [
+   "Rajasthan"
+  ],
+  "611884": [
+   "Haryana"
+  ],
+  "611918": [
+   "Gujarat"
+  ],
+  "611927": [
+   "Andhra Pradesh"
+  ],
+  "611929": [
+   "Rajasthan"
+  ],
+  "611943": [
+   "Gujarat"
+  ],
+  "611945": [
+   "Gujarat"
+  ],
+  "611970": [
+   "Gujarat"
+  ],
+  "611971": [
+   "Gujarat"
+  ],
+  "611974": [
+   "Gujarat"
+  ],
+  "612072": [
+   "Gujarat"
+  ],
+  "612096": [
+   "West Bengal"
+  ],
+  "612815": [
+   "Chhattisgarh"
+  ],
+  "612827": [
+   "Andhra Pradesh"
+  ],
+  "612834": [
+   "Odisha"
+  ],
+  "612845": [
+   "Maharashtra"
+  ],
+  "613002": [
+   "Tamil Nadu"
+  ],
+  "613015": [
+   "Maharashtra"
+  ],
+  "615915": [
+   "Odisha"
+  ],
+  "616227": [
+   "Jharkhand",
+   "West Bengal"
+  ],
+  "616586": [
+   "Odisha",
+   "West Bengal"
+  ],
+  "616588": [
+   "Jharkhand",
+   "Odisha",
+   "West Bengal"
+  ],
+  "616694": [
+   "Odisha"
+  ],
+  "616695": [
+   "Odisha"
+  ],
+  "616697": [
+   "Andhra Pradesh"
+  ],
+  "616699": [
+   "Bihar",
+   "Jharkhand",
+   "West Bengal",
+   "Uttar Pradesh"
+  ],
+  "616701": [
+   "Assam"
+  ],
+  "616839": [
+   "Odisha"
+  ],
+  "616841": [
+   "Rajasthan"
+  ],
+  "616842": [
+   "Gujarat",
+   "Rajasthan"
+  ],
+  "616843": [
+   "Rajasthan"
+  ],
+  "616857": [
+   "Andhra Pradesh",
+   "Telangana"
+  ],
+  "616983": [
+   "Gujarat"
+  ],
+  "617210": [
+   "Andhra Pradesh",
+   "Tamil Nadu"
+  ],
+  "617213": [
+   "Uttar Pradesh"
+  ],
+  "617214": [
+   "Andhra Pradesh",
+   "Telangana"
+  ],
+  "617215": [
+   "Maharashtra"
+  ],
+  "617216": [
+   "Andhra Pradesh"
+  ],
+  "617224": [
+   "Bihar",
+   "Uttar Pradesh"
+  ],
+  "617231": [
+   "Bihar"
+  ],
+  "617239": [
+   "Bihar"
+  ],
+  "617245": [
+   "Bihar",
+   "West Bengal"
+  ],
+  "617252": [
+   "Uttar Pradesh"
+  ],
+  "617333": [
+   "Bihar",
+   "Uttar Pradesh"
+  ],
+  "617364": [
+   "Maharashtra"
+  ],
+  "617370": [
+   "Uttar Pradesh"
+  ],
+  "617372": [
+   "Jharkhand"
+  ],
+  "617403": [
+   "Rajasthan"
+  ],
+  "617404": [
+   "Rajasthan"
+  ],
+  "617409": [
+   "Telangana"
+  ],
+  "617832": [
+   "Jharkhand"
+  ],
+  "703586": [
+   "Karnataka",
+   "Tamil Nadu"
+  ],
+  "705237": [
+   "Haryana",
+   "Gujarat",
+   "Rajasthan",
+   "Maharashtra",
+   "Uttar Pradesh"
+  ],
+  "705244": [
+   "Tamil Nadu"
+  ],
+  "705253": [
+   "Andhra Pradesh"
+  ],
+  "705356": [
+   "Maharashtra"
+  ],
+  "705357": [
+   "Maharashtra"
+  ],
+  "705358": [
+   "Odisha"
+  ],
+  "705359": [
+   "Odisha"
+  ],
+  "705366": [
+   "Bihar"
+  ],
+  "705368": [
+   "Bihar"
+  ],
+  "705373": [
+   "Bihar"
+  ],
+  "705375": [
+   "Bihar",
+   "Jharkhand"
+  ],
+  "705385": [
+   "Bihar",
+   "Jharkhand"
+  ],
+  "705391": [
+   "Manipur"
+  ],
+  "705392": [
+   "Assam",
+   "Nagaland"
+  ],
+  "705394": [
+   "Assam",
+   "Meghalaya"
+  ],
+  "705401": [
+   "Arunachal Pradesh",
+   "Assam"
+  ],
+  "705410": [
+   "Himachal Pradesh",
+   "Punjab"
+  ],
+  "705419": [
+   "Madhya Pradesh"
+  ],
+  "705424": [
+   "Haryana",
+   "Himachal Pradesh"
+  ],
+  "705432": [
+   "Sikkim",
+   "West Bengal"
+  ],
+  "705433": [
+   "Chhattisgarh"
+  ],
+  "705444": [
+   "Chhattisgarh"
+  ],
+  "705450": [
+   "Bihar"
+  ],
+  "705453": [
+   "Madhya Pradesh",
+   "Gujarat"
+  ],
+  "705454": [
+   "Madhya Pradesh",
+   "Gujarat"
+  ],
+  "705457": [
+   "Madhya Pradesh",
+   "Maharashtra"
+  ],
+  "705458": [
+   "Gujarat"
+  ],
+  "705479": [
+   "Maharashtra"
+  ],
+  "705480": [
+   "Madhya Pradesh",
+   "Uttar Pradesh"
+  ],
+  "705481": [
+   "Madhya Pradesh",
+   "Rajasthan"
+  ],
+  "705489": [
+   "Tamil Nadu"
+  ],
+  "705490": [
+   "Karnataka"
+  ],
+  "705491": [
+   "Andhra Pradesh",
+   "Karnataka"
+  ],
+  "705492": [
+   "Karnataka"
+  ],
+  "705493": [
+   "Karnataka"
+  ],
+  "705494": [
+   "Andhra Pradesh",
+   "Karnataka"
+  ],
+  "705495": [
+   "Karnataka"
+  ],
+  "705496": [
+   "Karnataka"
+  ],
+  "705497": [
+   "Maharashtra"
+  ],
+  "705498": [
+   "Maharashtra"
+  ],
+  "705500": [
+   "Maharashtra"
+  ],
+  "705502": [
+   "Maharashtra"
+  ],
+  "705504": [
+   "Maharashtra"
+  ],
+  "705505": [
+   "Maharashtra"
+  ],
+  "705506": [
+   "Maharashtra"
+  ],
+  "705507": [
+   "Madhya Pradesh",
+   "Maharashtra"
+  ],
+  "705510": [
+   "Odisha"
+  ],
+  "705511": [
+   "Chhattisgarh",
+   "Odisha"
+  ],
+  "705512": [
+   "Andhra Pradesh",
+   "Odisha"
+  ],
+  "705513": [
+   "Odisha"
+  ],
+  "705514": [
+   "Odisha"
+  ],
+  "705515": [
+   "Odisha"
+  ],
+  "705526": [
+   "Bihar"
+  ],
+  "705527": [
+   "Bihar"
+  ],
+  "705528": [
+   "Bihar"
+  ],
+  "705562": [
+   "Bihar",
+   "Uttar Pradesh"
+  ],
+  "705567": [
+   "Uttar Pradesh"
+  ],
+  "705572": [
+   "Assam"
+  ],
+  "705583": [
+   "Delhi"
+  ],
+  "705588": [
+   "Uttar Pradesh"
+  ],
+  "705598": [
+   "Madhya Pradesh",
+   "Uttar Pradesh"
+  ],
+  "705608": [
+   "Madhya Pradesh",
+   "Uttar Pradesh"
+  ],
+  "705610": [
+   "Andhra Pradesh",
+   "Tamil Nadu"
+  ],
+  "705616": [
+   "Chhattisgarh",
+   "Odisha"
+  ],
+  "705617": [
+   "Chhattisgarh",
+   "Maharashtra"
+  ],
+  "705628": [
+   "Jharkhand",
+   "Odisha"
+  ],
+  "705629": [
+   "Odisha",
+   "West Bengal"
+  ],
+  "705632": [
+   "Andhra Pradesh",
+   "Telangana"
+  ],
+  "705635": [
+   "Kerala",
+   "Tamil Nadu"
+  ],
+  "705638": [
+   "Kerala"
+  ],
+  "705639": [
+   "Kerala"
+  ],
+  "705659": [
+   "Madhya Pradesh"
+  ],
+  "705661": [
+   "Madhya Pradesh"
+  ],
+  "705663": [
+   "Karnataka"
+  ],
+  "705667": [
+   "Madhya Pradesh",
+   "Rajasthan",
+   "Uttar Pradesh"
+  ],
+  "705668": [
+   "Jharkhand",
+   "West Bengal"
+  ],
+  "705728": [
+   "Gujarat",
+   "Maharashtra",
+   "Dadra and Nagar Haveli and Daman and Diu"
+  ],
+  "705735": [
+   "Maharashtra"
+  ],
+  "705741": [
+   "Odisha"
+  ],
+  "705742": [
+   "Odisha"
+  ],
+  "705752": [
+   "Rajasthan"
+  ],
+  "705761": [
+   "Karnataka"
+  ],
+  "705764": [
+   "Madhya Pradesh",
+   "Rajasthan"
+  ],
+  "705765": [
+   "Jharkhand"
+  ],
+  "705766": [
+   "Uttar Pradesh"
+  ],
+  "705772": [
+   "Uttar Pradesh"
+  ],
+  "705774": [
+   "Uttar Pradesh"
+  ],
+  "705777": [
+   "Uttar Pradesh"
+  ],
+  "705780": [
+   "Uttar Pradesh"
+  ],
+  "705782": [
+   "Uttar Pradesh"
+  ],
+  "705783": [
+   "Punjab"
+  ],
+  "705785": [
+   "Jharkhand"
+  ],
+  "705793": [
+   "Madhya Pradesh",
+   "Gujarat",
+   "Delhi",
+   "Rajasthan",
+   "Maharashtra"
+  ],
+  "705919": [
+   "Rajasthan"
+  ],
+  "705933": [
+   "Madhya Pradesh"
+  ],
+  "705941": [
+   "Karnataka"
+  ],
+  "706759": [
+   "Bihar"
+  ],
+  "706763": [
+   "Gujarat"
+  ],
+  "706836": [
+   "Rajasthan"
+  ],
+  "706837": [
+   "Jharkhand"
+  ],
+  "706854": [
+   "Chhattisgarh"
+  ],
+  "706860": [
+   "Bihar"
+  ],
+  "706865": [
+   "Goa"
+  ],
+  "706866": [
+   "Rajasthan"
+  ],
+  "709812": [
+   "Gujarat"
+  ],
+  "709813": [
+   "Gujarat"
+  ],
+  "709815": [
+   "Chhattisgarh",
+   "Maharashtra"
+  ],
+  "709816": [
+   "Chhattisgarh",
+   "Maharashtra"
+  ],
+  "709817": [
+   "Chhattisgarh",
+   "Maharashtra"
+  ],
+  "709818": [
+   "Chhattisgarh"
+  ],
+  "709819": [
+   "Chhattisgarh"
+  ],
+  "900874": [
+   "Bihar"
+  ]
+ },
+ "freeze": "2026-07"
+}

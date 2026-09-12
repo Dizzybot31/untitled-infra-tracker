@@ -297,17 +297,36 @@ class TestNhaiAdapterOffline(unittest.TestCase):
 
 
 class TestPublish(unittest.TestCase):
-    def test_records_without_geometry_are_dropped_not_faked(self):
+    def test_records_without_geometry_are_listed_not_dropped(self):
+        """Behaviour deliberately changed when PAIMANA landed.
+
+        These used to be dropped silently, which hid real projects and broke the
+        census arithmetic. They are now published to unlocated.json and counted,
+        because "we cannot place this" is information, not a reason to disappear
+        a project.
+        """
         good = minimal(id="good")
         bad = minimal(id="bad")
         bad["geo"]["point"] = None
         with tempfile.TemporaryDirectory() as d:
             meta = publish_mod.publish([good, bad], [], [], out_dir=d)
             self.assertEqual(meta["counts"]["published"], 1)
-            self.assertEqual(meta["counts"]["dropped_no_geometry"], 1)
+            self.assertEqual(meta["counts"]["unlocated"], 1)
             with open(os.path.join(d, "projects.geojson")) as fh:
                 fc = json.load(fh)
-            self.assertEqual(len(fc["features"]), 1)
+            self.assertEqual(len(fc["features"]), 1, "unplaceable rows stay off the globe")
+            with open(os.path.join(d, "unlocated.json")) as fh:
+                un = json.load(fh)
+            self.assertEqual([u["id"] for u in un], ["bad"], "but they are still published")
+            self.assertTrue(un[0].get("why"), "and they say why they are not drawn")
+
+    def test_census_reconciles_after_publish(self):
+        rows = [minimal(id="a"), minimal(id="b")]
+        rows[1]["geo"]["point"] = None
+        with tempfile.TemporaryDirectory() as d:
+            c = publish_mod.publish(rows, [], [], out_dir=d)["counts"]
+            self.assertEqual(c["published"] + c["unlocated"] + c["superseded"],
+                             c["total_in_store"])
 
     def test_verified_only_excludes_seed(self):
         seed = minimal(id="s", tags=["seed", "unverified"])

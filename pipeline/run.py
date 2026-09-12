@@ -23,6 +23,7 @@ from typing import Dict, List, Type
 from .adapters.base import Adapter, SchemaDrift, SourceUnavailable
 from .adapters.seed import SeedAdapter
 from .adapters.nhai_geoserver import NhaiGeoserverAdapter
+from .adapters.mospi_paimana import MospiPaimanaAdapter
 from .core import gazetteer, ids, publish as publish_mod, schema
 from .core.store import Store
 
@@ -33,13 +34,9 @@ DB_PATH = os.path.join("data", "tracker.sqlite")
 ADAPTERS: List[Type[Adapter]] = [
     SeedAdapter,
     NhaiGeoserverAdapter,
+    MospiPaimanaAdapter,
 ]
 
-try:  # optional, added once the source is verified reachable
-    from .adapters.mospi_flash import MospiFlashAdapter
-    ADAPTERS.append(MospiFlashAdapter)
-except ImportError:
-    pass
 
 
 def _run_id(source_id: str, started: str) -> str:
