@@ -10,6 +10,7 @@ export const TEXTURES = {
 
 export const DATA = {
   projects: '../data/derived/projects.geojson',
+  alignments: '../data/derived/alignments.geojson',
   corridors: '../data/derived/corridors.geojson',
   details: '../data/derived/details.json',
   meta: '../data/derived/meta.json',

@@ -20,13 +20,16 @@ const ENTRY = { lat: 20.2, lng: 79.5, altitude: 1.9 };
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarse = window.matchMedia('(pointer: coarse)').matches;
 
-function altitudeFor(d) {
-  // 0 for everything on schedule; climbs to 0.22 at 60+ months overdue.
-  return 0.006 + Math.min(d.maxOverdue || 0, 60) / 60 * 0.15;
+// Points now sit almost flat. The vertical columns are gone: they made the map
+// read as a pincushion and were impossible to navigate, and the thing they
+// encoded (lateness) is carried by colour instead, which works equally well
+// lying down and does not occlude its neighbours.
+function altitudeFor() {
+  return 0.004;
 }
 
 function radiusFor(d) {
-  const base = 0.20 + 0.12 * Math.sqrt(Math.max(0, (d.n || 1) - 1));
+  const base = 0.16 + 0.10 * Math.sqrt(Math.max(0, (d.n || 1) - 1));
   return coarse ? base * 1.7 : base;
 }
 
@@ -41,6 +44,15 @@ function tooltip(d) {
     ? `<div style="color:${BUCKET_COLOR.past_due};font-size:11px;margin-top:3px">${d.maxOverdue} months past due</div>`
     : '';
   return `<div class="tip"><div class="tip-h">${head}</div><div class="tip-s">${sub}</div>${late}</div>`;
+}
+
+function pathTooltip(d) {
+  const r = d.row;
+  const late = r.overdueMonths > 0
+    ? `<div style="color:${BUCKET_COLOR.past_due};font-size:11px;margin-top:3px">${r.overdueMonths} months past due</div>`
+    : '';
+  return `<div class="tip"><div class="tip-h">${esc(r.title)}</div>
+    <div class="tip-s">${esc([r.state, crore(r.cost_inr_crore)].filter(Boolean).join(' \u00b7 '))}</div>${late}</div>`;
 }
 
 function stateTooltip(d) {
@@ -76,13 +88,29 @@ export function createGlobe(el, { onSelect, onSelectState }) {
     .pointLabel(tooltip)
     .onPointClick((d) => (d.n > 1 ? onSelectState({ stack: d }) : onSelect(d.members[0].id)));
 
+  // --- located work that has a REAL published road shape -------------------
+  // Drawn along the actual alignment rather than as a marker. Each piece is a
+  // separate path; the source splits a highway into disjoint segments and
+  // joining them would draw road that does not exist.
+  g.pathsData([])
+    .pathPoints('coords')
+    .pathPointLat((p) => p[1])
+    .pathPointLng((p) => p[0])
+    .pathColor((d) => BUCKET_COLOR[d.bucket])
+    .pathStroke((d) => (d.bucket === 'past_due' || d.bucket === 'stopped' ? 2.4 : 1.7))
+    .pathPointAlt(0.0045)
+    .pathResolution(2)
+    .pathTransitionDuration(0)
+    .pathLabel((d) => pathTooltip(d))
+    .onPathClick((d) => onSelect(d.id));
+
   // --- unlocated work, as flat rings on the sphere -------------------------
   // Rings are used rather than DOM overlays so they foreshorten and occlude with
   // the globe instead of floating over it like UI stuck on glass.
   g.ringsData([])
     .ringLat('lat').ringLng('lng')
-    .ringColor(() => () => BUCKET_COLOR.unlocated)
-    .ringMaxRadius((d) => Math.min(4.2, 1.1 + Math.sqrt(d.n) * 0.42))
+    .ringColor(() => () => 'rgba(93,107,130,0.42)')
+    .ringMaxRadius((d) => Math.min(2.3, 0.65 + Math.sqrt(d.n) * 0.20))
     .ringPropagationSpeed(0)
     .ringRepeatPeriod(0)
     .ringAltitude(0.0015);
@@ -95,9 +123,9 @@ export function createGlobe(el, { onSelect, onSelectState }) {
   g.labelsData([])
     .labelLat('lat').labelLng('lng')
     .labelText((d) => `${d.state} · ${d.n}`)
-    .labelSize(0.34)
+    .labelSize(0.28)
     .labelDotRadius((d) => Math.min(0.9, 0.3 + Math.sqrt(d.n) * 0.075))
-    .labelColor(() => 'rgba(190,202,222,0.72)')
+    .labelColor(() => 'rgba(178,190,212,0.55)')
     .labelAltitude(0.004)
     .labelResolution(2)
     .onLabelClick((d) => onSelectState({ state: d }));
@@ -125,6 +153,7 @@ export function createGlobe(el, { onSelect, onSelectState }) {
   return {
     globe: g,
     setPoints(marks) { g.pointsData(marks); },
+    setPaths(paths) { g.pathsData(paths); },
     setStates(states) { g.ringsData(states).labelsData(states); },
     setLattice(arcs) { g.arcsData(arcs); },
     // One easing move on load, then the camera stays put unless the user moves it.

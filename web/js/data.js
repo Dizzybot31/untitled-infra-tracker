@@ -145,6 +145,41 @@ export async function detailFor(id) {
   return all[id] || null;
 }
 
+// ---------------------------------------------------------------------------
+// Real road shapes, joined to projects on NHAI's Unique Project Code (upc).
+//
+// These are the published alignments, simplified for display (see
+// pipeline/core/simplify.py). Roughly a third of drawn projects have one; the
+// rest have no geometry at all and stay as points or state circles.
+export async function loadAlignments() {
+  try {
+    const fc = await getJSON(DATA.alignments);
+    const byUpc = new Map();
+    for (const f of fc.features) {
+      const upc = f.properties && f.properties.upc;
+      if (upc && f.geometry) byUpc.set(upc, f.geometry.coordinates);
+    }
+    return byUpc;
+  } catch {
+    return new Map();   // the map still works without them, just as points
+  }
+}
+
+// Turn {project, alignment} into one drawable path per piece. Pieces are kept
+// separate on purpose: the source splits a highway into many disjoint segments
+// and joining them draws road that does not exist.
+export function buildPaths(rows, byUpc) {
+  const paths = [];
+  for (const r of rows) {
+    const pieces = byUpc.get(r.native_id || r.upc);
+    if (!pieces) continue;
+    for (const piece of pieces) {
+      paths.push({ id: r.id, bucket: r.bucket, title: r.title, row: r, coords: piece });
+    }
+  }
+  return paths;
+}
+
 // The faint ground lattice of already-open corridors. Loaded after first paint:
 // it is texture, not information, and must never delay the marks.
 export async function loadLattice() {

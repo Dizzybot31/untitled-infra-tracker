@@ -146,6 +146,28 @@ docs/           architecture, sources, legal, runbook, decision records
 
 Commands:
 
+### Road shapes (run occasionally, not daily)
+
+Projects that NHAI publishes an alignment for are drawn as the actual road
+rather than as a marker. Those shapes come from a separate, slow command:
+
+```bash
+python3 -m pipeline.alignments      # ~5 min, writes data/derived/alignments.geojson
+```
+
+Run it when you want to pick up new or re-routed alignments — monthly is
+plenty. It is deliberately **not** part of the daily refresh: road routes do not
+change day to day, the source layer is ~176 MB, and the GeoServer is a fragile
+undocumented public endpoint that should not be hit every morning.
+
+The output is ~360 KB because each alignment is simplified for display
+(Douglas-Peucker at ~550 m, below one screen pixel at the default zoom) — 4.4
+million vertices reduce to about 13,000 with no visible change to the shapes.
+
+One rule enforced by tests: the disjoint pieces of a single highway are **never**
+joined end to end. The source splits one road into as many as 4,762 fragments,
+and chaining them draws phantom road across open country.
+
 ```bash
 python3 -m pipeline.run sources         # what adapters exist and what they are
 python3 -m pipeline.run ingest --only seed
